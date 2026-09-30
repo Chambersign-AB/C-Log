@@ -1,0 +1,43 @@
+## .NET build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+artifacts/
+*.user
+*.suo
+*.userprefs
+
+## Test and coverage output
+[Tt]est[Rr]esult*/
+coverage*.json
+coverage*.xml
+coverage*.info
+*.trx
+*.coverage
+
+## IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*~
+
+## Watcher runtime state — regenerated, and holds log content that does not belong in git
+data/
+*.db
+*.db-shm
+*.db-wal
+triage.jsonl
+
+## Secrets. The Seq API key lives in user-secrets or the environment, never in the repo.
+appsettings.*.local.json
+*.local.json
+.env
+
+## OS
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,52 @@
+# Architecture
+
+The two-step idea, in ten lines:
+
+1. Errors arrive in Seq in far greater numbers than anyone can read.
+2. **Step one is cheap and local.** The Watcher groups errors by fingerprint, so a thousand
+   events become a handful of distinct problems, and remembers which fingerprints it has
+   already handled — an error is triaged once, not once per occurrence.
+3. Rules in `knowledge/rules.json` drop what the team has already judged not worth reading.
+   This is deterministic and costs nothing.
+4. A local Mistral, via Ollama, then sorts each genuinely new error into NOISE, KNOWN or
+   ANALYZE, using `knowledge/known-errors.md` as its reference. Nothing leaves the machine,
+   and personal data is removed before the model sees it.
+5. **Step two is expensive and reserved.** Only ANALYZE survives step one, so a deeper and
+   costlier analysis is spent on the few errors that earned it.
+6. This repository is step one. Step two is not built yet.
+
+## Shape of a cycle
+
+```
+Seq ──▶ scrub ──▶ fingerprint ──▶ group ──▶ rules ──▶ seen before? ──▶ Mistral ──▶ console
+        (PII)      (identity)               (drop)    (SQLite)         (judge)     triage.jsonl
+```
+
+Scrubbing comes first, before the fingerprint, the database, the model and the output, so no
+step downstream can hold personal data.
+
+## Fingerprint
+
+Three parts, chosen because they stay the same between two occurrences of one bug:
+
+- the exception type,
+- the message template, normalised so numbers, ids, GUIDs, timestamps and personal-data
+  placeholders collapse to `{}`,
+- the topmost stack frame outside `Microsoft.` and `System.` — framework frames are what the
+  error travelled through, not where it came from. File and line are stripped, so an edit
+  above the failing line does not mint a new error.
+
+## Why these boundaries
+
+- **SQLite, not memory.** A redeploy must not re-report last week's errors.
+- **Rules before the model.** A team decision should not depend on a model agreeing with it,
+  and a filtered error must not spend the per-cycle judgement budget.
+- **A budget per cycle.** A burst of new errors costs a bounded amount of time, and the
+  remainder is judged on the next cycle rather than dropped.
+- **An unusable answer is not a crash.** A local model is not a reliable JSON emitter. A bad
+  answer is logged and the error is reported again if it recurs.
+
+## What is deliberately not here
+
+No GitHub, no Claude, no issue-filing, no alerting. Step one has to be trustworthy and quiet
+before anything is wired to act on its output.
