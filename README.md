@@ -64,13 +64,13 @@ Everything is under the `CLog` section of `src/CLog/appsettings.json`:
 | `Seq:MaxEvents` | Events fetched per cycle | `200` |
 | `Ollama:Url` | Ollama base URL | `http://localhost:11434` |
 | `Ollama:Model` | Model to judge with | `mistral` |
-| `Ollama:TimeoutSeconds` | How long to wait for a judgement | `120` |
+| `Ollama:TimeoutSeconds` | How long to wait for one answer from the model | `300` |
 | `IntervalMinutes` | How often to poll | `5` |
 | `Triage:Mode` | `TwoStep` (two yes/no questions) or `SingleCall` (the original three-way prompt, kept for comparison) | `TwoStep` |
 | `Triage:KnownPrompt` | First question; `{knowledge}` and `{error}` are filled in | see `appsettings.json` |
 | `Triage:NoisePrompt` | Second question; `{error}` is filled in | see `appsettings.json` |
 | `MaxJudgementsPerRun` | Cap on errors judged per cycle; in `TwoStep` each costs two or more model calls | `10` |
-| `LookbackMinutes` | How far back to ask Seq; keep above `IntervalMinutes` | `10` |
+| `LookbackMinutes` | How far back the first fetch after a start reaches; later fetches continue from the last completed one | `10` |
 
 Small models (7B) could not choose between three verdicts in one call, which is why `TwoStep`
 is the default. Switching model or rewording a question is a config change: set `Ollama:Model`

@@ -29,15 +29,35 @@ public sealed class TriageService(
     private readonly TimeProvider _time = time ?? TimeProvider.System;
     private readonly TwoStepJudge _twoStep = new(ollama, options.Value.Triage, logger);
 
+    /// <summary>
+    /// Events reach Seq a little after they are stamped, so a fetch starting exactly where the
+    /// last one ended would miss the ones still in transit. Fetching the overlap twice is
+    /// harmless: fingerprints already handled are only counted.
+    /// </summary>
+    private static readonly TimeSpan FetchOverlap = TimeSpan.FromMinutes(1);
+
+    /// <summary>Where the next fetch starts. Null until Seq has been read once since start.</summary>
+    private DateTimeOffset? _fetchFrom;
+
     public async Task<TriageCycleResult> RunOnceAsync(CancellationToken cancellationToken = default)
     {
         var now = _time.GetUtcNow();
-        var since = now.AddMinutes(-Math.Max(1, _options.LookbackMinutes));
+
+        // The window rolls from the last fetch whose errors all got an outcome, however long
+        // that cycle took; a fixed lookback dropped whatever was logged during a long cycle.
+        // LookbackMinutes only decides how far back the first fetch after a start reaches.
+        var since = _fetchFrom ?? now.AddMinutes(-Math.Max(1, _options.LookbackMinutes));
 
         var events = await seq.GetErrorEventsAsync(since, cancellationToken);
+
+        // Pinned until this cycle completes: if it is cut short, or leaves errors behind, the
+        // next fetch starts from the same place and picks them up again.
+        _fetchFrom = since;
+
         if (events.Count == 0)
         {
             logger.LogInformation("No error events since {Since:u}", since);
+            _fetchFrom = now - FetchOverlap;
             return new TriageCycleResult();
         }
 
@@ -50,6 +70,7 @@ public sealed class TriageService(
         var judged = 0;
         var failures = 0;
         var deferred = 0;
+        var unreported = 0;
 
         foreach (var group in groups)
         {
@@ -61,10 +82,10 @@ public sealed class TriageService(
             if (rule is not null)
             {
                 filtered++;
-                if (!await CountIfSeenAsync(group.Fingerprint.Hash, now, cancellationToken))
+                if (!await CountIfSeenAsync(group.Fingerprint.Hash, now, cancellationToken)
+                    && !await ReportAsync(TriageReports.Filtered(group, rule, now), cancellationToken))
                 {
-                    await sink.WriteAsync(TriageReports.Filtered(group, rule, now), cancellationToken);
-                    await MarkSeenAsync(group.Fingerprint.Hash, now);
+                    unreported++;
                 }
 
                 continue;
@@ -92,8 +113,10 @@ public sealed class TriageService(
                 failures++;
             }
 
-            await sink.WriteAsync(TriageReports.Judged(group, verdict, now), cancellationToken);
-            await MarkSeenAsync(group.Fingerprint.Hash, now);
+            if (!await ReportAsync(TriageReports.Judged(group, verdict, now), cancellationToken))
+            {
+                unreported++;
+            }
         }
 
         if (deferred > 0)
@@ -101,6 +124,18 @@ public sealed class TriageService(
             logger.LogWarning(
                 "Judgement budget of {Budget} spent; {Deferred} error group(s) left for the next cycle",
                 budget, deferred);
+        }
+
+        if (unreported > 0)
+        {
+            logger.LogWarning(
+                "{Unreported} result(s) could not be written; those errors stay new and are reported again next cycle",
+                unreported);
+        }
+
+        if (deferred == 0 && unreported == 0)
+        {
+            _fetchFrom = now - FetchOverlap;
         }
 
         logger.LogInformation(
@@ -114,8 +149,24 @@ public sealed class TriageService(
             FilteredByRules = filtered,
             Judged = judged,
             JudgementFailures = failures,
-            Deferred = deferred
+            Deferred = deferred,
+            Unreported = unreported
         };
+    }
+
+    /// <summary>
+    /// Writes an outcome and, only if that worked, marks the fingerprint seen. An outcome
+    /// nobody can read is not an outcome: the error stays new and is reported again.
+    /// </summary>
+    private async Task<bool> ReportAsync(TriageRecord record, CancellationToken cancellationToken)
+    {
+        if (!await sink.WriteAsync(record, cancellationToken))
+        {
+            return false;
+        }
+
+        await MarkSeenAsync(record.Fingerprint, record.At);
+        return true;
     }
 
     /// <summary>Counts another sighting of a fingerprint that already has an outcome.</summary>

@@ -9,9 +9,18 @@ public sealed class RecordingTriageSink : ITriageSink
 
     public IReadOnlyList<TriageRecord> Records => _records;
 
-    public Task WriteAsync(TriageRecord record, CancellationToken cancellationToken = default)
+    /// <summary>How many of the coming writes fail, standing in for a triage log that cannot be written.</summary>
+    public int FailNextWrites { get; set; }
+
+    public Task<bool> WriteAsync(TriageRecord record, CancellationToken cancellationToken = default)
     {
+        if (FailNextWrites > 0)
+        {
+            FailNextWrites--;
+            return Task.FromResult(false);
+        }
+
         _records.Add(record);
-        return Task.CompletedTask;
+        return Task.FromResult(true);
     }
 }

@@ -44,6 +44,15 @@ Three parts, chosen because they stay the same between two occurrences of one bu
   the fingerprint first meant a restart during that time left the error seen but never
   reported. The cost of the safe order is that a crash between the write and the mark reports
   an error twice.
+- **An unwritten result is not an outcome.** `triage.jsonl` is appended with three retries, in
+  case another program holds the file for a moment. If the line still cannot be written the
+  error is left unmarked and is judged and reported again next cycle.
+- **The fetch window rolls.** Each fetch starts where the last completed one was made (less a
+  minute of overlap for events still on their way into Seq), not a fixed number of minutes
+  back, so errors logged during a long cycle are not skipped. The window stays put while a
+  cycle is cut short, hits the budget or cannot write a result. `LookbackMinutes` only
+  decides how far back the first fetch after a start reaches; the window is not kept across
+  restarts.
 - **One cycle at a time.** A cycle that outlasts the interval is not joined by a second one;
   the poll that falls due is skipped and logged as `Cycle still running, skipping poll`.
 - **Rules before the model.** A team decision should not depend on a model agreeing with it,

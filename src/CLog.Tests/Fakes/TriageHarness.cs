@@ -11,7 +11,8 @@ public sealed record TriageHarness(
     TriageService Service,
     RecordingOllamaClient Ollama,
     RecordingTriageSink Sink,
-    InMemoryFingerprintStore Store)
+    InMemoryFingerprintStore Store,
+    FakeSeqClient Seq)
 {
     public static TriageHarness Build(
         IEnumerable<SeqEvent> events,
@@ -22,7 +23,8 @@ public sealed record TriageHarness(
         // SingleCall unless a test asks otherwise: the cycle tests script the model with a
         // ready-made verdict, which is what that mode consumes. The product default is TwoStep.
         TriageMode mode = TriageMode.SingleCall,
-        Func<string, string?>? reply = null)
+        Func<string, string?>? reply = null,
+        TimeProvider? time = null)
     {
         var ollama = new RecordingOllamaClient(answer ?? new TriageVerdict(Verdict.Analyze, "a real bug", null));
         if (reply is not null)
@@ -40,17 +42,19 @@ public sealed record TriageHarness(
             Triage = new TriageOptions { Mode = mode }
         });
 
+        var seq = new FakeSeqClient([.. events]);
         var service = new TriageService(
-            new FakeSeqClient([.. events]),
+            seq,
             store,
             ollama,
             sink,
             new StaticKnowledgeSource(knownErrors),
             new StaticRuleSetProvider(RuleSet.Parse(rulesJson)),
             options,
-            new TestLogger<TriageService>());
+            new TestLogger<TriageService>(),
+            time);
 
-        return new TriageHarness(service, ollama, sink, store);
+        return new TriageHarness(service, ollama, sink, store, seq);
     }
 
     /// <summary>Distinct errors, each with its own fingerprint.</summary>

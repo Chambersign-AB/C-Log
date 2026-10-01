@@ -19,10 +19,10 @@ public class TriageInterruptionTests
     {
         public List<(TriageOutcome Outcome, bool AlreadySeen)> Writes { get; } = [];
 
-        public Task WriteAsync(TriageRecord record, CancellationToken cancellationToken = default)
+        public Task<bool> WriteAsync(TriageRecord record, CancellationToken cancellationToken = default)
         {
             Writes.Add((record.Outcome, store.Seen.ContainsKey(record.Fingerprint)));
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
     }
 

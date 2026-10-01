@@ -61,4 +61,7 @@ public sealed record TriageCycleResult
 
     /// <summary>New errors left for the next cycle because the judgement budget ran out.</summary>
     public int Deferred { get; init; }
+
+    /// <summary>Errors whose result could not be written. Left unmarked, so they are reported again.</summary>
+    public int Unreported { get; init; }
 }

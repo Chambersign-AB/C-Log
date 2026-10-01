@@ -18,7 +18,7 @@ public sealed class CLogOptions
     /// </summary>
     public int MaxJudgementsPerRun { get; set; } = 10;
 
-    /// <summary>How far back to ask Seq for errors. Should exceed IntervalMinutes to cover a missed cycle.</summary>
+    /// <summary>How far back the first fetch after a start reaches. Later fetches continue from the last completed one.</summary>
     public int LookbackMinutes { get; set; } = 10;
 
     public string KnowledgeFile { get; set; } = "knowledge/known-errors.md";
@@ -45,7 +45,8 @@ public sealed class OllamaOptions
 {
     public string Url { get; set; } = "http://localhost:11434";
     public string Model { get; set; } = "mistral";
-    public int TimeoutSeconds { get; set; } = 120;
+    /// <summary>Per question. A 7B model on a CPU needs a minute or more, longer while it is still loading.</summary>
+    public int TimeoutSeconds { get; set; } = 300;
 }
 
 public enum TriageMode
