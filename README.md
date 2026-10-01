@@ -14,8 +14,11 @@ at. Nothing leaves the machine.
 - **removes personal data** — personal identity numbers (10 or 12 digits, with or without a
   separator), e-mail addresses, and any field named `name`, `firstName` or `lastName`;
 - drops anything matched by an **ignore rule** in `knowledge/rules.json`, before any AI call;
-- asks a **local Mistral through Ollama** to sort it into `NOISE`, `KNOWN` or `ANALYZE`, using
-  `knowledge/known-errors.md` as the reference for what is already understood;
+- asks a **local Mistral through Ollama** two yes/no questions to sort it into `NOISE`, `KNOWN`
+  or `ANALYZE`: is it described in `knowledge/known-errors.md` (yes is `KNOWN`, with the
+  solution copied from that file), and if not, is it a failed call from outside rather than a
+  fault in our code (yes is `NOISE`). Anything else, including an answer that is neither yes
+  nor no, is `ANALYZE`;
 - writes the result to the **console** and appends it to **`data/triage.jsonl`**.
 
 Seen fingerprints live in SQLite, so a restart does not re-report last week's errors.
@@ -63,8 +66,15 @@ Everything is under the `CLog` section of `src/CLog/appsettings.json`:
 | `Ollama:Model` | Model to judge with | `mistral` |
 | `Ollama:TimeoutSeconds` | How long to wait for a judgement | `120` |
 | `IntervalMinutes` | How often to poll | `5` |
-| `MaxJudgementsPerRun` | Cap on AI calls per cycle | `10` |
+| `Triage:Mode` | `TwoStep` (two yes/no questions) or `SingleCall` (the original three-way prompt, kept for comparison) | `TwoStep` |
+| `Triage:KnownPrompt` | First question; `{knowledge}` and `{error}` are filled in | see `appsettings.json` |
+| `Triage:NoisePrompt` | Second question; `{error}` is filled in | see `appsettings.json` |
+| `MaxJudgementsPerRun` | Cap on errors judged per cycle; in `TwoStep` each costs two or more model calls | `10` |
 | `LookbackMinutes` | How far back to ask Seq; keep above `IntervalMinutes` | `10` |
+
+Small models (7B) could not choose between three verdicts in one call, which is why `TwoStep`
+is the default. Switching model or rewording a question is a config change: set `Ollama:Model`
+and the two prompts. The answer is read as yes for `Ja`/`Yes` and no for `Nej`/`No`.
 
 The API key is a secret and does not belong in a committed file. Use either:
 

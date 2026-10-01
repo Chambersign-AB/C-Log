@@ -10,4 +10,10 @@ public interface IOllamaClient
     /// or its answer could not be read; the caller treats that as an unjudged error, not a fault.
     /// </summary>
     Task<TriageVerdict?> JudgeAsync(string errorReport, string knownErrors, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends one prompt and returns the model's answer as plain text, unparsed. Returns null
+    /// when the model could not be reached; an empty answer is an answer, not a failure.
+    /// </summary>
+    Task<string?> AskAsync(string prompt, CancellationToken cancellationToken = default);
 }

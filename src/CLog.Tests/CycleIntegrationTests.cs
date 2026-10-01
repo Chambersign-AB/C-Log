@@ -62,6 +62,8 @@ public sealed class CycleIntegrationTests : IDisposable
         {
             Seq = new SeqOptions { ApiKey = "test-key" },
             Ollama = new OllamaOptions { Model = "mistral" },
+            // These tests stub Ollama with a JSON verdict, which is the SingleCall protocol.
+            Triage = new TriageOptions { Mode = TriageMode.SingleCall },
             MaxJudgementsPerRun = 10,
             LookbackMinutes = 10
         });

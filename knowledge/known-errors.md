@@ -1,7 +1,8 @@
 # Known errors
 
-One heading per error. CLog sends this whole file to the model on every judgement, so
+One `##` heading per error. CLog sends every entry to the model on every judgement, so
 keep entries short and keep the file tidy — a long file makes the model slower and vaguer.
+What stands under **Solution** is what CLog reports back when the error is recognised.
 
 An entry is worth adding once an error has been understood. Until then it is not known, and
 CLog should keep reporting it.

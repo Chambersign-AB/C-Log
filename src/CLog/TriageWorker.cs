@@ -25,8 +25,8 @@ public sealed class TriageWorker(
 
         await store.InitializeAsync(stoppingToken);
         logger.LogInformation(
-            "CLog started. Polling {SeqUrl} every {Interval}, judging with {Model} at {OllamaUrl}, at most {Max} judgement(s) per cycle",
-            _options.Seq.Url, interval, _options.Ollama.Model, _options.Ollama.Url, _options.MaxJudgementsPerRun);
+            "CLog started. Polling {SeqUrl} every {Interval}, judging with {Model} at {OllamaUrl} in {Mode} mode, at most {Max} judgement(s) per cycle",
+            _options.Seq.Url, interval, _options.Ollama.Model, _options.Ollama.Url, _options.Triage.Mode, _options.MaxJudgementsPerRun);
 
         using var timer = new PeriodicTimer(interval, timeProvider);
 

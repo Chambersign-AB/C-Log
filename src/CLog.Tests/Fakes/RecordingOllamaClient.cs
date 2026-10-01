@@ -28,4 +28,17 @@ public sealed class RecordingOllamaClient(TriageVerdict? answer = null) : IOllam
         _knownErrors.Add(knownErrors);
         return Task.FromResult(Answer);
     }
+
+    private readonly List<string> _questions = [];
+
+    /// <summary>What the fake says to a yes/no question, given the prompt. Null stands for an unreachable model.</summary>
+    public Func<string, string?> Reply { get; set; } = _ => "Nej";
+
+    public IReadOnlyList<string> Questions => _questions;
+
+    public Task<string?> AskAsync(string prompt, CancellationToken cancellationToken = default)
+    {
+        _questions.Add(prompt);
+        return Task.FromResult(Reply(prompt));
+    }
 }

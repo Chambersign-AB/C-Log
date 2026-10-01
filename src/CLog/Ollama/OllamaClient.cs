@@ -60,31 +60,9 @@ public sealed class OllamaClient : IOllamaClient
             ]
         };
 
-        string? content;
-        try
+        var (reached, content) = await SendAsync(request, cancellationToken);
+        if (!reached)
         {
-            using var response = await _http.PostAsJsonAsync("api/chat", request, cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogWarning(
-                    "Ollama answered {StatusCode} for model {Model}; leaving the error unjudged",
-                    (int)response.StatusCode,
-                    _options.Model);
-                return null;
-            }
-
-            var body = await response.Content.ReadFromJsonAsync<ChatResponse>(cancellationToken);
-            content = body?.Message?.Content;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
-        {
-            // Ollama not running, a model still loading, or a truncated body: all recoverable,
-            // all worth one warning and a retry on the next cycle.
-            _logger.LogWarning(ex, "Could not reach Ollama at {Url}; leaving the error unjudged", _options.Url);
             return null;
         }
 
@@ -98,6 +76,54 @@ public sealed class OllamaClient : IOllamaClient
             error,
             Truncate(content, 500));
         return null;
+    }
+
+    public async Task<string?> AskAsync(string prompt, CancellationToken cancellationToken = default)
+    {
+        // No JSON format here: the answer is one plain word, and asking for JSON makes a small
+        // model wrap it in an object of its own invention.
+        var request = new ChatRequest
+        {
+            Model = _options.Model,
+            Stream = false,
+            Format = null,
+            Messages = [new ChatMessage { Role = "user", Content = prompt }]
+        };
+
+        var (reached, content) = await SendAsync(request, cancellationToken);
+        return reached ? content ?? "" : null;
+    }
+
+    private async Task<(bool Reached, string? Content)> SendAsync(
+        ChatRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await _http.PostAsJsonAsync("api/chat", request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "Ollama answered {StatusCode} for model {Model}; leaving the error unjudged",
+                    (int)response.StatusCode,
+                    _options.Model);
+                return (false, null);
+            }
+
+            var body = await response.Content.ReadFromJsonAsync<ChatResponse>(cancellationToken);
+            return (true, body?.Message?.Content);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+        {
+            // Ollama not running, a model still loading, or a truncated body: all recoverable,
+            // all worth one warning and a retry on the next cycle.
+            _logger.LogWarning(ex, "Could not reach Ollama at {Url}; leaving the error unjudged", _options.Url);
+            return (false, null);
+        }
     }
 
     internal static string BuildUserPrompt(string errorReport, string knownErrors)
@@ -138,7 +164,8 @@ public sealed class OllamaClient : IOllamaClient
 
         /// <summary>Asks Ollama to constrain the answer to JSON. Advisory, so we still parse defensively.</summary>
         [JsonPropertyName("format")]
-        public string Format { get; set; } = "json";
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Format { get; set; } = "json";
     }
 
     private sealed class ChatMessage

@@ -7,11 +7,15 @@ public sealed class CLogOptions
 
     public SeqOptions Seq { get; set; } = new();
     public OllamaOptions Ollama { get; set; } = new();
+    public TriageOptions Triage { get; set; } = new();
 
     /// <summary>How often the watcher polls Seq.</summary>
     public int IntervalMinutes { get; set; } = 5;
 
-    /// <summary>Upper bound on AI calls per cycle, so a burst of new errors cannot flood Ollama.</summary>
+    /// <summary>
+    /// Upper bound on errors judged per cycle, so a burst of new errors cannot flood Ollama.
+    /// In TwoStep mode one judgement is two questions, more when a known error is pinned down.
+    /// </summary>
     public int MaxJudgementsPerRun { get; set; } = 10;
 
     /// <summary>How far back to ask Seq for errors. Should exceed IntervalMinutes to cover a missed cycle.</summary>
@@ -42,4 +46,46 @@ public sealed class OllamaOptions
     public string Url { get; set; } = "http://localhost:11434";
     public string Model { get; set; } = "mistral";
     public int TimeoutSeconds { get; set; } = 120;
+}
+
+public enum TriageMode
+{
+    /// <summary>Two yes/no questions: is it a known error, then is it a failed call from outside.</summary>
+    TwoStep,
+
+    /// <summary>The original single prompt asking the model to pick NOISE, KNOWN or ANALYZE. Kept for comparison.</summary>
+    SingleCall
+}
+
+public sealed class TriageOptions
+{
+    public const string KnowledgePlaceholder = "{knowledge}";
+    public const string ErrorPlaceholder = "{error}";
+
+    /// <summary>
+    /// TwoStep is the default because 7B models could not pick between three verdicts in one
+    /// call, but answer a single yes/no question reliably.
+    /// </summary>
+    public TriageMode Mode { get; set; } = TriageMode.TwoStep;
+
+    /// <summary>First TwoStep question. {knowledge} and {error} are filled in; yes means KNOWN.</summary>
+    public string KnownPrompt { get; set; } =
+        """
+        Beskriver kunskapsbasen nedan exakt detta fel? Svara ENDAST Ja eller Nej.
+
+        # Kunskapsbas
+        {knowledge}
+
+        # Fel
+        {error}
+        """;
+
+    /// <summary>Second TwoStep question. {error} is filled in; yes means NOISE.</summary>
+    public string NoisePrompt { get; set; } =
+        """
+        Är detta ett misslyckat anrop utifrån — fel API-nyckel, 401/404, avbruten begäran — snarare än ett fel i vår kod? Svara ENDAST Ja eller Nej.
+
+        # Fel
+        {error}
+        """;
 }

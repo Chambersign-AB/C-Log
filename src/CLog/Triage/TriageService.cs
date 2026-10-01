@@ -27,6 +27,7 @@ public sealed class TriageService(
 {
     private readonly CLogOptions _options = options.Value;
     private readonly TimeProvider _time = time ?? TimeProvider.System;
+    private readonly TwoStepJudge _twoStep = new(ollama, options.Value.Triage, logger);
 
     public async Task<TriageCycleResult> RunOnceAsync(CancellationToken cancellationToken = default)
     {
@@ -82,7 +83,9 @@ public sealed class TriageService(
 
             judged++;
             var report = TriageReports.BuildErrorReport(group);
-            var verdict = await ollama.JudgeAsync(report, knownErrors, cancellationToken);
+            var verdict = _options.Triage.Mode == TriageMode.SingleCall
+                ? await ollama.JudgeAsync(report, knownErrors, cancellationToken)
+                : await _twoStep.JudgeAsync(report, knownErrors, cancellationToken);
             if (verdict is null)
             {
                 failures++;

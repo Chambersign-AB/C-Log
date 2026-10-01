@@ -9,8 +9,9 @@ The two-step idea, in ten lines:
 3. Rules in `knowledge/rules.json` drop what the team has already judged not worth reading.
    This is deterministic and costs nothing.
 4. A local Mistral, via Ollama, then sorts each genuinely new error into NOISE, KNOWN or
-   ANALYZE, using `knowledge/known-errors.md` as its reference. Nothing leaves the machine,
-   and personal data is removed before the model sees it.
+   ANALYZE by answering two yes/no questions: is it in `knowledge/known-errors.md`, and if
+   not, is it a failed call from outside. Nothing leaves the machine, and personal data is
+   removed before the model sees it.
 5. **Step two is expensive and reserved.** Only ANALYZE survives step one, so a deeper and
    costlier analysis is spent on the few errors that earned it.
 6. This repository is step one. Step two is not built yet.
@@ -43,8 +44,14 @@ Three parts, chosen because they stay the same between two occurrences of one bu
   and a filtered error must not spend the per-cycle judgement budget.
 - **A budget per cycle.** A burst of new errors costs a bounded amount of time, and the
   remainder is judged on the next cycle rather than dropped.
-- **An unusable answer is not a crash.** A local model is not a reliable JSON emitter. A bad
-  answer is logged and the error is reported again if it recurs.
+- **Two yes/no questions, not one three-way choice.** 7B models could not pick between NOISE,
+  KNOWN and ANALYZE in one call, but answer yes or no reliably. The old prompt remains behind
+  `Triage:Mode = SingleCall` for comparison.
+- **The solution comes from the file, not the model.** A yes only says the error is known; the
+  fix is copied from the matching entry, so the model cannot invent one.
+- **An unusable answer is not a crash.** A local model does not reliably answer in the shape
+  it was asked for. An answer that is neither yes nor no becomes ANALYZE with a warning, so
+  doubt puts the error in front of a person.
 
 ## What is deliberately not here
 

@@ -18,16 +18,26 @@ public sealed record TriageHarness(
         string rulesJson = """{ "ignore": [] }""",
         TriageVerdict? answer = null,
         int maxJudgements = 10,
-        string knownErrors = "# Known errors")
+        string knownErrors = "# Known errors",
+        // SingleCall unless a test asks otherwise: the cycle tests script the model with a
+        // ready-made verdict, which is what that mode consumes. The product default is TwoStep.
+        TriageMode mode = TriageMode.SingleCall,
+        Func<string, string?>? reply = null)
     {
         var ollama = new RecordingOllamaClient(answer ?? new TriageVerdict(Verdict.Analyze, "a real bug", null));
+        if (reply is not null)
+        {
+            ollama.Reply = reply;
+        }
+
         var sink = new RecordingTriageSink();
         var store = new InMemoryFingerprintStore();
 
         var options = Options.Create(new CLogOptions
         {
             MaxJudgementsPerRun = maxJudgements,
-            LookbackMinutes = 10
+            LookbackMinutes = 10,
+            Triage = new TriageOptions { Mode = mode }
         });
 
         var service = new TriageService(
