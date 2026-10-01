@@ -48,6 +48,14 @@ public sealed class OllamaOptions
     public string Model { get; set; } = "mistral";
     /// <summary>Per question. A 7B model on a CPU needs a minute or more, longer while it is still loading.</summary>
     public int TimeoutSeconds { get; set; } = 300;
+
+    /// <summary>
+    /// Zero, with a fixed seed, so the same error gets the same verdict every time it is asked
+    /// about. Sent with every request, triage and analysis alike.
+    /// </summary>
+    public double Temperature { get; set; }
+
+    public int Seed { get; set; } = 42;
 }
 
 public enum TriageMode

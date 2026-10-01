@@ -101,6 +101,10 @@ public sealed class OllamaClient : IOllamaClient
         ChatRequest request,
         CancellationToken cancellationToken)
     {
+        // Set here, on the one path every request takes, so no call can be sent without them:
+        // the same error must get the same verdict whenever it is asked about.
+        request.Options = new SamplingOptions { Temperature = _options.Temperature, Seed = _options.Seed };
+
         try
         {
             using var response = await _http.PostAsJsonAsync("api/chat", request, cancellationToken);
@@ -169,6 +173,18 @@ public sealed class OllamaClient : IOllamaClient
         [JsonPropertyName("format")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Format { get; set; } = "json";
+
+        [JsonPropertyName("options")]
+        public SamplingOptions Options { get; set; } = new();
+    }
+
+    private sealed class SamplingOptions
+    {
+        [JsonPropertyName("temperature")]
+        public double Temperature { get; set; }
+
+        [JsonPropertyName("seed")]
+        public int Seed { get; set; }
     }
 
     private sealed class ChatMessage

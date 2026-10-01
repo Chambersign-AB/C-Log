@@ -66,6 +66,8 @@ Everything is under the `CLog` section of `src/CLog/appsettings.json`:
 | `Ollama:Url` | Ollama base URL | `http://localhost:11434` |
 | `Ollama:Model` | Model to judge with | `mistral` |
 | `Ollama:TimeoutSeconds` | How long to wait for one answer from the model | `300` |
+| `Ollama:Temperature` | Sampling temperature, sent with every request; `0` makes the verdict repeatable | `0` |
+| `Ollama:Seed` | Sampling seed, sent with every request | `42` |
 | `IntervalMinutes` | How often to poll | `5` |
 | `Triage:Mode` | `TwoStep` (two yes/no questions) or `SingleCall` (the original three-way prompt, kept for comparison) | `TwoStep` |
 | `Triage:KnownPrompt` | First question; `{knowledge}` and `{error}` are filled in | see `appsettings.json` |
