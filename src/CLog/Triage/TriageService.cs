@@ -77,6 +77,7 @@ public sealed class TriageService(
         foreach (var group in groups)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            await CarryOverAsync(group.Fingerprint, now, cancellationToken);
 
             // Rules come first, so an error the team has already chosen to ignore never costs
             // an AI call and never counts against the per-cycle budget.
@@ -200,6 +201,31 @@ public sealed class TriageService(
 
         await MarkSeenAsync(record.Fingerprint, record.At);
         return true;
+    }
+
+    /// <summary>
+    /// An error with a stack trace used to be hashed with its message template. What was seen
+    /// or filed under that hash is taken over by the new one, so changing the identity does
+    /// not report every old error once more, or file a second issue for it.
+    /// </summary>
+    private async Task CarryOverAsync(ErrorFingerprint fingerprint, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (fingerprint.PreviousHash is not { } previous
+            || await store.IsSeenAsync(fingerprint.Hash, cancellationToken))
+        {
+            return;
+        }
+
+        var issue = await store.GetIssueAsync(previous, cancellationToken);
+        if (issue is not null && await store.GetIssueAsync(fingerprint.Hash, cancellationToken) is null)
+        {
+            await store.SaveIssueAsync(fingerprint.Hash, issue.Number, issue.LastReportedAt, cancellationToken);
+        }
+
+        if (await store.IsSeenAsync(previous, cancellationToken))
+        {
+            await store.TryMarkSeenAsync(fingerprint.Hash, now, cancellationToken);
+        }
     }
 
     /// <summary>Counts another sighting of a fingerprint that already has an outcome.</summary>

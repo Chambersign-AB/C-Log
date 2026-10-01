@@ -29,14 +29,22 @@ step downstream can hold personal data.
 
 ## Fingerprint
 
-Three parts, chosen because they stay the same between two occurrences of one bug:
+Built from parts that stay the same between two occurrences of one bug. The exception type is
+always one of them. The other depends on whether the event has a stack trace:
 
-- the exception type,
-- the message template, normalised so numbers, ids, GUIDs, timestamps and personal-data
-  placeholders collapse to `{}`,
-- the topmost stack frame outside `Microsoft.` and `System.` — framework frames are what the
-  error travelled through, not where it came from. File and line are stripped, so an edit
-  above the failing line does not mint a new error.
+- **With a stack trace:** the topmost stack frame outside `Microsoft.` and `System.` —
+  framework frames are what the error travelled through, not where it came from. File and
+  line are stripped, so an edit above the failing line does not mint a new error. The message
+  template is left out: one exception is routinely logged twice, by request logging and by the
+  unhandled-exception handler, under two templates, and that filed two issues for one error.
+  Only the top frame is used, not the whole trace, because those two logs catch the exception
+  at different depths and differ in the frames below it. The cost is that two failures of the
+  same type thrown from the same method count as one error.
+- **Without a stack trace:** the message template, normalised so numbers, ids, GUIDs,
+  timestamps and personal-data placeholders collapse to `{}`.
+
+Hashes stored before the template was dropped are still honoured: an error already seen or
+filed under its old hash is taken over by the new one instead of being reported again.
 
 ## Why these boundaries
 

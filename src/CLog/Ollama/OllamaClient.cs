@@ -124,7 +124,22 @@ public sealed class OllamaClient : IOllamaClient
         {
             throw;
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+        catch (TaskCanceledException)
+        {
+            // HttpClient reports its own timeout this way. The size is logged because it is the
+            // usual cause: a long analysis prompt on a CPU does not finish in time, and without
+            // the numbers that looks the same as a model that is down.
+            var characters = request.Messages.Sum(m => m.Content.Length);
+            _logger.LogWarning(
+                "Ollama model {Model} did not answer within {Timeout} s. The request was {Lines} line(s), {Characters} characters, about {Tokens} tokens; leaving the error unjudged",
+                request.Model,
+                (int)_http.Timeout.TotalSeconds,
+                request.Messages.Sum(m => m.Content.Split('\n').Length),
+                characters,
+                EstimateTokens(characters));
+            return (false, null);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException)
         {
             // Ollama not running, a model still loading, or a truncated body: all recoverable,
             // all worth one warning and a retry on the next cycle.
@@ -147,6 +162,12 @@ public sealed class OllamaClient : IOllamaClient
                 {errorReport.Trim()}
                 """;
     }
+
+    /// <summary>
+    /// A rule of thumb of four characters to a token, not the model's own count: Ollama only
+    /// reports that in an answer, and a request that timed out has none.
+    /// </summary>
+    internal static int EstimateTokens(int characters) => (characters + 3) / 4;
 
     private static string Truncate(string? text, int max)
     {

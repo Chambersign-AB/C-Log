@@ -6,10 +6,11 @@ using CLog.Model;
 namespace CLog.Triage;
 
 /// <summary>
-/// Turns an error into a stable identity: exception type + normalised message template +
-/// topmost non-framework stack frame. Everything that varies between two occurrences of the
-/// same bug - timestamps, ids, personal data, file line numbers - is normalised away first,
-/// so the same bug always produces the same hash.
+/// Turns an error into a stable identity. With a stack trace that is exception type + topmost
+/// non-framework stack frame; without one it is exception type + normalised message template.
+/// Everything that varies between two occurrences of the same bug - timestamps, ids, personal
+/// data, file line numbers - is normalised away first, so the same bug always produces the
+/// same hash.
 /// </summary>
 public static partial class Fingerprinter
 {
@@ -68,9 +69,22 @@ public static partial class Fingerprinter
 
         var template = NormalizeTemplate(source);
         var topFrame = exception.TopApplicationFrame();
-        var hash = Hash(exception.Type, template, topFrame);
+        var withTemplate = Hash(exception.Type, template, topFrame);
 
-        return new ErrorFingerprint(hash, exception.Type, template, topFrame);
+        if (exception.Frames.Count == 0)
+        {
+            return new ErrorFingerprint(withTemplate, exception.Type, template, topFrame);
+        }
+
+        // With a stack trace, the place the exception came from is the identity and the
+        // template is left out: one exception is often logged twice, by request logging and
+        // by the unhandled-exception handler, under two templates, and that is one error.
+        // Only the top application frame is used, not the whole trace, because the two logs
+        // catch the exception at different depths and so differ in the frames below it.
+        return new ErrorFingerprint(Hash(exception.Type, topFrame), exception.Type, template, topFrame)
+        {
+            PreviousHash = withTemplate
+        };
     }
 
     /// <summary>Reduces a message to the part that is the same for every occurrence.</summary>
@@ -96,9 +110,9 @@ public static partial class Fingerprinter
         return text;
     }
 
-    private static string Hash(string exceptionType, string template, string topFrame)
+    private static string Hash(params string[] parts)
     {
-        var payload = string.Join("\n", exceptionType, template, topFrame);
+        var payload = string.Join("\n", parts);
         var digest = SHA256.HashData(Encoding.UTF8.GetBytes(payload));
         return Convert.ToHexStringLower(digest)[..16];
     }

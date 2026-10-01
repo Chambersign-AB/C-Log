@@ -8,9 +8,10 @@ at. With step one alone, nothing leaves the machine.
 
 **CLog** polls Seq every five minutes and, for each error it has never seen before:
 
-- groups it by **fingerprint** — exception type, normalised message template, and the topmost
-  stack frame outside `Microsoft.` and `System.` — so a thousand events become a handful of
-  problems, and the same problem is triaged once;
+- groups it by **fingerprint** — exception type and the topmost stack frame outside
+  `Microsoft.` and `System.`, or exception type and normalised message template when there is
+  no stack trace — so a thousand events become a handful of problems, and the same problem is
+  triaged once;
 - **removes personal data** — personal identity numbers (10 or 12 digits, with or without a
   separator), e-mail addresses, and any field named `name`, `firstName` or `lastName`;
 - drops anything matched by an **ignore rule** in `knowledge/rules.json`, before any AI call;

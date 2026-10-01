@@ -10,5 +10,12 @@ public sealed record ErrorFingerprint(
     string NormalizedTemplate,
     string TopFrame)
 {
+    /// <summary>
+    /// The hash this error had while the message template was part of every identity. Null
+    /// when it is no different from <see cref="Hash"/>. Lets what was already seen or filed
+    /// under the old hash be recognised instead of reported a second time.
+    /// </summary>
+    public string? PreviousHash { get; init; }
+
     public override string ToString() => Hash;
 }
