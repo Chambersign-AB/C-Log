@@ -51,6 +51,18 @@ public sealed class SqliteFingerprintStore : IFingerprintStore
         _logger.LogDebug("Fingerprint store ready at {ConnectionString}", _connectionString);
     }
 
+    public async Task<bool> IsSeenAsync(string fingerprint, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT 1 FROM seen_fingerprints WHERE fingerprint = $fingerprint;";
+        command.Parameters.AddWithValue("$fingerprint", fingerprint);
+
+        return await command.ExecuteScalarAsync(cancellationToken) is not null;
+    }
+
     public async Task<bool> TryMarkSeenAsync(
         string fingerprint,
         DateTimeOffset seenAt,

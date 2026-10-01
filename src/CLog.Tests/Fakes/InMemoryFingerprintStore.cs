@@ -11,6 +11,9 @@ public sealed class InMemoryFingerprintStore : IFingerprintStore
 
     public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
+    public Task<bool> IsSeenAsync(string fingerprint, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_seen.ContainsKey(fingerprint));
+
     public Task<bool> TryMarkSeenAsync(
         string fingerprint,
         DateTimeOffset seenAt,

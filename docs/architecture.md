@@ -40,6 +40,12 @@ Three parts, chosen because they stay the same between two occurrences of one bu
 ## Why these boundaries
 
 - **SQLite, not memory.** A redeploy must not re-report last week's errors.
+- **Seen only after the outcome is written.** A judgement can take minutes on a CPU. Marking
+  the fingerprint first meant a restart during that time left the error seen but never
+  reported. The cost of the safe order is that a crash between the write and the mark reports
+  an error twice.
+- **One cycle at a time.** A cycle that outlasts the interval is not joined by a second one;
+  the poll that falls due is skipped and logged as `Cycle still running, skipping poll`.
 - **Rules before the model.** A team decision should not depend on a model agreeing with it,
   and a filtered error must not spend the per-cycle judgement budget.
 - **A budget per cycle.** A burst of new errors costs a bounded amount of time, and the

@@ -9,9 +9,19 @@ public sealed class TestLogger<T> : ILogger<T>
 {
     private readonly List<LogEntry> _entries = [];
 
-    public IReadOnlyList<LogEntry> Entries => _entries;
+    /// <summary>A snapshot, so a test can read it while a background worker is still logging.</summary>
+    public IReadOnlyList<LogEntry> Entries
+    {
+        get
+        {
+            lock (_entries)
+            {
+                return [.. _entries];
+            }
+        }
+    }
 
-    public IEnumerable<LogEntry> Warnings => _entries.Where(e => e.Level >= LogLevel.Warning);
+    public IEnumerable<LogEntry> Warnings => Entries.Where(e => e.Level >= LogLevel.Warning);
 
     public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
 
@@ -24,7 +34,11 @@ public sealed class TestLogger<T> : ILogger<T>
         Exception? exception,
         Func<TState, Exception?, string> formatter)
     {
-        _entries.Add(new LogEntry(logLevel, formatter(state, exception), exception));
+        var entry = new LogEntry(logLevel, formatter(state, exception), exception);
+        lock (_entries)
+        {
+            _entries.Add(entry);
+        }
     }
 
     private sealed class NullScope : IDisposable

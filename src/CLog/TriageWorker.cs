@@ -30,29 +30,49 @@ public sealed class TriageWorker(
 
         using var timer = new PeriodicTimer(interval, timeProvider);
 
+        // One cycle at a time. A slow model can make a cycle outlast the interval; the poll
+        // that falls due meanwhile is skipped and said so, rather than queued up behind it.
+        Task? cycle = null;
+
         do
         {
-            try
+            if (cycle is { IsCompleted: false })
             {
-                await triage.RunOnceAsync(stoppingToken);
+                logger.LogWarning("Cycle still running, skipping poll");
+                continue;
             }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (SeqUnavailableException ex)
-            {
-                // Expected whenever Seq restarts or the network blips. One line, no stack.
-                logger.LogWarning("{Reason}. Retrying in {Interval}", ex.Message, interval);
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Triage cycle failed; retrying in {Interval}", interval);
-            }
+
+            cycle = RunCycleAsync(interval, stoppingToken);
         }
         while (await SafeWaitAsync(timer, stoppingToken));
 
+        if (cycle is not null)
+        {
+            await cycle;
+        }
+
         logger.LogInformation("CLog stopped");
+    }
+
+    private async Task RunCycleAsync(TimeSpan interval, CancellationToken stoppingToken)
+    {
+        try
+        {
+            await triage.RunOnceAsync(stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Shutting down. The error being judged is not marked seen, so the next start picks it up.
+        }
+        catch (SeqUnavailableException ex)
+        {
+            // Expected whenever Seq restarts or the network blips. One line, no stack.
+            logger.LogWarning("{Reason}. Retrying in {Interval}", ex.Message, interval);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Triage cycle failed; retrying in {Interval}", interval);
+        }
     }
 
     private static async Task<bool> SafeWaitAsync(PeriodicTimer timer, CancellationToken stoppingToken)

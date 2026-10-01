@@ -108,7 +108,10 @@ tail -f data/triage.jsonl
 
 The first cycle runs immediately, then every `IntervalMinutes`. With Seq or Ollama down the
 cycle logs a warning and retries on the next tick — neither one being unavailable stops the
-service.
+service. With a model slower than the interval, the polls that fall due during a cycle are
+skipped (`Cycle still running, skipping poll`) and the next one runs once the cycle is done.
+An error is remembered as seen only after its result is written, so stopping the service
+mid-judgement loses nothing: the error is judged on the next start.
 
 **Test**
 

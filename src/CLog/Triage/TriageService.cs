@@ -61,9 +61,10 @@ public sealed class TriageService(
             if (rule is not null)
             {
                 filtered++;
-                if (await store.TryMarkSeenAsync(group.Fingerprint.Hash, now, cancellationToken))
+                if (!await CountIfSeenAsync(group.Fingerprint.Hash, now, cancellationToken))
                 {
                     await sink.WriteAsync(TriageReports.Filtered(group, rule, now), cancellationToken);
+                    await MarkSeenAsync(group.Fingerprint.Hash, now);
                 }
 
                 continue;
@@ -76,7 +77,7 @@ public sealed class TriageService(
                 continue;
             }
 
-            if (!await store.TryMarkSeenAsync(group.Fingerprint.Hash, now, cancellationToken))
+            if (await CountIfSeenAsync(group.Fingerprint.Hash, now, cancellationToken))
             {
                 continue;
             }
@@ -92,6 +93,7 @@ public sealed class TriageService(
             }
 
             await sink.WriteAsync(TriageReports.Judged(group, verdict, now), cancellationToken);
+            await MarkSeenAsync(group.Fingerprint.Hash, now);
         }
 
         if (deferred > 0)
@@ -115,4 +117,25 @@ public sealed class TriageService(
             Deferred = deferred
         };
     }
+
+    /// <summary>Counts another sighting of a fingerprint that already has an outcome.</summary>
+    private async Task<bool> CountIfSeenAsync(string fingerprint, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (!await store.IsSeenAsync(fingerprint, cancellationToken))
+        {
+            return false;
+        }
+
+        await store.TryMarkSeenAsync(fingerprint, now, cancellationToken);
+        return true;
+    }
+
+    /// <summary>
+    /// A fingerprint is marked seen only once its outcome is written. A judgement can take
+    /// minutes, and marking first meant a restart or a fault in that time left the error seen
+    /// but never reported. Not cancellable: a shutdown arriving between the write and the mark
+    /// would report the error twice. The worst case now is a duplicate line, never a lost one.
+    /// </summary>
+    private Task MarkSeenAsync(string fingerprint, DateTimeOffset now) =>
+        store.TryMarkSeenAsync(fingerprint, now, CancellationToken.None);
 }
