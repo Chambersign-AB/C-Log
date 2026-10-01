@@ -36,7 +36,7 @@ This is the rule that matters most here, because the whole service reads product
   `900101-1234`, `anna@example.com`, `Anna Svensson`. `example.com`, `example.org` and
   `example.se` are reserved for exactly this. Never a real colleague, customer or address.
 - Never put real personal data in `knowledge/known-errors.md` either. It is sent to the model
-  verbatim on every judgement. Use the placeholders the Watcher writes: `[PERSONNUMMER]`,
+  verbatim on every judgement. Use the placeholders CLog writes: `[PERSONNUMMER]`,
   `[EMAIL]`, `[NAME]`.
 - Secrets are not configuration. The Seq API key comes from user-secrets or an environment
   variable; `appsettings.json` ships an empty string and nothing else.

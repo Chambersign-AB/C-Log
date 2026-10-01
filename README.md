@@ -6,7 +6,7 @@ at. Nothing leaves the machine.
 
 ## What
 
-**Watcher** polls Seq every five minutes and, for each error it has never seen before:
+**CLog** polls Seq every five minutes and, for each error it has never seen before:
 
 - groups it by **fingerprint** — exception type, normalised message template, and the topmost
   stack frame outside `Microsoft.` and `System.` — so a thousand events become a handful of
@@ -51,7 +51,7 @@ reaches the model.
 
 **Configure**
 
-Everything is under the `Watcher` section of `src/Watcher/appsettings.json`:
+Everything is under the `CLog` section of `src/CLog/appsettings.json`:
 
 | Setting | Meaning | Default |
 | --- | --- | --- |
@@ -69,25 +69,25 @@ Everything is under the `Watcher` section of `src/Watcher/appsettings.json`:
 The API key is a secret and does not belong in a committed file. Use either:
 
 ```bash
-cd src/Watcher
-dotnet user-secrets set "Watcher:Seq:ApiKey" "your-key-here"
+cd src/CLog
+dotnet user-secrets set "CLog:Seq:ApiKey" "your-key-here"
 ```
 
 or an environment variable — `__` stands for the nesting:
 
 ```bash
 # bash
-export Watcher__Seq__ApiKey="your-key-here"
+export CLog__Seq__ApiKey="your-key-here"
 ```
 ```powershell
 # PowerShell
-$env:Watcher__Seq__ApiKey = "your-key-here"
+$env:CLog__Seq__ApiKey = "your-key-here"
 ```
 
 **Run**
 
 ```bash
-dotnet run --project src/Watcher
+dotnet run --project src/CLog
 ```
 
 Results appear on the console and in `data/triage.jsonl`, one JSON object per line:
@@ -119,8 +119,8 @@ No test needs Seq, Ollama or a network connection.
 ## Layout
 
 ```
-src/Watcher/            the background service
-src/Watcher.Tests/      tests
+src/CLog/            the background service
+src/CLog.Tests/      tests
 knowledge/              known-errors.md and rules.json — edited by people, read every cycle
 docs/architecture.md    the two-step idea and why the boundaries are where they are
 data/                   SQLite state and triage.jsonl (git-ignored, created on first run)

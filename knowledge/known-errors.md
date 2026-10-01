@@ -1,12 +1,12 @@
 # Known errors
 
-One heading per error. The Watcher sends this whole file to the model on every judgement, so
+One heading per error. CLog sends this whole file to the model on every judgement, so
 keep entries short and keep the file tidy — a long file makes the model slower and vaguer.
 
 An entry is worth adding once an error has been understood. Until then it is not known, and
-the Watcher should keep reporting it.
+CLog should keep reporting it.
 
-No personal data in this file. Use placeholders, the same ones the Watcher writes:
+No personal data in this file. Use placeholders, the same ones CLog writes:
 `[PERSONNUMMER]`, `[EMAIL]`, `[NAME]`.
 
 ---

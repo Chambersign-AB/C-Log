@@ -25,7 +25,7 @@ coverage*.info
 *.swp
 *~
 
-## Watcher runtime state — regenerated, and holds log content that does not belong in git
+## CLog runtime state — regenerated, and holds log content that does not belong in git
 data/
 *.db
 *.db-shm

@@ -5,9 +5,9 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Watcher", "src\Watcher\Watcher.csproj", "{FAA9A309-4C13-476F-AC85-689BED3D051C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CLog", "src\CLog\CLog.csproj", "{FAA9A309-4C13-476F-AC85-689BED3D051C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Watcher.Tests", "src\Watcher.Tests\Watcher.Tests.csproj", "{DA82512D-0A63-4339-90B6-6F04CC147129}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CLog.Tests", "src\CLog.Tests\CLog.Tests.csproj", "{DA82512D-0A63-4339-90B6-6F04CC147129}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

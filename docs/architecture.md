@@ -3,7 +3,7 @@
 The two-step idea, in ten lines:
 
 1. Errors arrive in Seq in far greater numbers than anyone can read.
-2. **Step one is cheap and local.** The Watcher groups errors by fingerprint, so a thousand
+2. **Step one is cheap and local.** CLog groups errors by fingerprint, so a thousand
    events become a handful of distinct problems, and remembers which fingerprints it has
    already handled — an error is triaged once, not once per occurrence.
 3. Rules in `knowledge/rules.json` drop what the team has already judged not worth reading.
