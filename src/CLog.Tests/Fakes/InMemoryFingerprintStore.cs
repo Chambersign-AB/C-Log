@@ -11,6 +11,23 @@ public sealed class InMemoryFingerprintStore : IFingerprintStore
 
     public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
+    private readonly Dictionary<string, IssueLink> _issues = new(StringComparer.Ordinal);
+
+    public IReadOnlyDictionary<string, IssueLink> Issues => _issues;
+
+    public Task<IssueLink?> GetIssueAsync(string fingerprint, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_issues.GetValueOrDefault(fingerprint));
+
+    public Task SaveIssueAsync(
+        string fingerprint,
+        int issueNumber,
+        DateTimeOffset reportedAt,
+        CancellationToken cancellationToken = default)
+    {
+        _issues[fingerprint] = new IssueLink(issueNumber, reportedAt);
+        return Task.CompletedTask;
+    }
+
     public Task<bool> IsSeenAsync(string fingerprint, CancellationToken cancellationToken = default) =>
         Task.FromResult(_seen.ContainsKey(fingerprint));
 

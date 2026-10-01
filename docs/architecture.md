@@ -14,7 +14,8 @@ The two-step idea, in ten lines:
    removed before the model sees it.
 5. **Step two is expensive and reserved.** Only ANALYZE survives step one, so a deeper and
    costlier analysis is spent on the few errors that earned it.
-6. This repository is step one. Step two is not built yet.
+6. Step two reads the error against the code it came from, asks a model for cause, place and
+   fix, and files the result as a GitHub issue. It is off until configured.
 
 ## Shape of a cycle
 
@@ -68,7 +69,33 @@ Three parts, chosen because they stay the same between two occurrences of one bu
   it was asked for. An answer that is neither yes nor no becomes ANALYZE with a warning, so
   doubt puts the error in front of a person.
 
+## Step two
+
+```
+ANALYZE ──▶ stack frames ──▶ code at the commit ──▶ analysis model ──▶ GitHub issue
+            (top 3, CSign.*)  (±40 lines, git show)  (cause, place, fix) (once per fingerprint)
+```
+
+- **A targeted call, not an agent.** One prompt holding the error, a bounded excerpt of code
+  and the knowledge base. No GitHub Action and no coding agent are involved.
+- **The clone is read, never changed.** Files are read with `git show commit:path` rather
+  than by checking the commit out, so the clone can be somebody's working copy.
+- **Only paths the commit lists are read.** A frame carries a build-machine path; it is
+  matched to the repository file sharing the longest tail of it, and a tail shared by several
+  files is skipped rather than guessed. The commit value from the event is used only if it
+  is a bare hash.
+- **The issue is remembered apart from "seen".** It is saved the moment it exists. If the
+  result then cannot be recorded, the next cycle finds the issue and records it without
+  asking either model again, instead of filing a second one.
+- **GitHub down means not seen.** An error that could not be filed has no outcome, so it is
+  judged, analysed and filed on a later cycle.
+- **A model with nothing to say does not block the issue.** If the analysis model gives no
+  answer, the issue is filed with the error alone and says so.
+- **Recurrence is a comment, rate-limited.** An error that keeps happening is fetched every
+  cycle; its issue hears about it at most once per `RecurrenceCommentMinutes`.
+- **The model is behind `IAnalysisModel`.** Ollama today; a hosted model can replace it for
+  step two alone.
+
 ## What is deliberately not here
 
-No GitHub, no Claude, no issue-filing, no alerting. Step one has to be trustworthy and quiet
-before anything is wired to act on its output.
+No GitHub Action, no Claude, no alerting.

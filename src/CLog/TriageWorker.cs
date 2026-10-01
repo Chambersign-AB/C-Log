@@ -28,6 +28,13 @@ public sealed class TriageWorker(
             "CLog started. Polling {SeqUrl} every {Interval}, judging with {Model} at {OllamaUrl} in {Mode} mode, at most {Max} judgement(s) per cycle",
             _options.Seq.Url, interval, _options.Ollama.Model, _options.Ollama.Url, _options.Triage.Mode, _options.MaxJudgementsPerRun);
 
+        if (_options.Analysis.Enabled)
+        {
+            logger.LogInformation(
+                "Step two is on: ANALYZE errors are read against {RepoPath}, analysed with {Model} and filed in {Repository}",
+                _options.Analysis.RepoPath, _options.Analysis.Model, _options.Analysis.GitHub.Repository);
+        }
+
         using var timer = new PeriodicTimer(interval, timeProvider);
 
         // One cycle at a time. A slow model can make a cycle outlast the interval; the poll

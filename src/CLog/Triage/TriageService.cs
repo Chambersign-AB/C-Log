@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using CLog.Analysis;
 using CLog.Configuration;
 using CLog.Knowledge;
 using CLog.Model;
@@ -23,7 +24,8 @@ public sealed class TriageService(
     IRuleSetProvider rules,
     IOptions<CLogOptions> options,
     ILogger<TriageService> logger,
-    TimeProvider? time = null)
+    TimeProvider? time = null,
+    IssueReporter? issues = null)
 {
     private readonly CLogOptions _options = options.Value;
     private readonly TimeProvider _time = time ?? TimeProvider.System;
@@ -100,20 +102,51 @@ public sealed class TriageService(
 
             if (await CountIfSeenAsync(group.Fingerprint.Hash, now, cancellationToken))
             {
+                if (issues is not null)
+                {
+                    await issues.CommentIfDueAsync(group, now, cancellationToken);
+                }
+
                 continue;
             }
 
             judged++;
             var report = TriageReports.BuildErrorReport(group);
-            var verdict = _options.Triage.Mode == TriageMode.SingleCall
-                ? await ollama.JudgeAsync(report, knownErrors, cancellationToken)
-                : await _twoStep.JudgeAsync(report, knownErrors, cancellationToken);
-            if (verdict is null)
+            TriageVerdict? verdict;
+
+            // An issue without a seen fingerprint: it was filed, and then the result could not
+            // be recorded. The issue stands; asking the models again would only file a second.
+            var issue = issues is null
+                ? null
+                : (await store.GetIssueAsync(group.Fingerprint.Hash, cancellationToken))?.Number;
+            if (issue is not null)
             {
-                failures++;
+                verdict = new TriageVerdict(Verdict.Analyze, $"Already filed as issue #{issue}.", null);
+            }
+            else
+            {
+                verdict = _options.Triage.Mode == TriageMode.SingleCall
+                    ? await ollama.JudgeAsync(report, knownErrors, cancellationToken)
+                    : await _twoStep.JudgeAsync(report, knownErrors, cancellationToken);
+                if (verdict is null)
+                {
+                    failures++;
+                }
+
+                // Step two, for ANALYZE only: NOISE and KNOWN need nobody's time.
+                if (issues is not null && verdict?.Verdict == Verdict.Analyze)
+                {
+                    issue = await issues.FileAsync(group, report, knownErrors, now, cancellationToken);
+                    if (issue is null)
+                    {
+                        // Not filed, so not an outcome: left unseen and tried again next cycle.
+                        unreported++;
+                        continue;
+                    }
+                }
             }
 
-            if (!await ReportAsync(TriageReports.Judged(group, verdict, now), cancellationToken))
+            if (!await ReportAsync(TriageReports.Judged(group, verdict, now) with { IssueNumber = issue }, cancellationToken))
             {
                 unreported++;
             }
@@ -129,7 +162,7 @@ public sealed class TriageService(
         if (unreported > 0)
         {
             logger.LogWarning(
-                "{Unreported} result(s) could not be written; those errors stay new and are reported again next cycle",
+                "{Unreported} result(s) could not be written or filed; those errors stay new and are reported again next cycle",
                 unreported);
         }
 

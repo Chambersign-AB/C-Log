@@ -48,6 +48,9 @@ public sealed record TriageRecord
 
     /// <summary>The rule that filtered this error, when the outcome is FilteredByRule.</summary>
     public string? RuleId { get; init; }
+
+    /// <summary>The issue filed for this error, when step two is on and the verdict is ANALYZE.</summary>
+    public int? IssueNumber { get; init; }
 }
 
 /// <summary>What one polling cycle did. Logged as the cycle summary.</summary>

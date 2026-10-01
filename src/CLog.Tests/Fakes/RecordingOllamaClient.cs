@@ -36,9 +36,18 @@ public sealed class RecordingOllamaClient(TriageVerdict? answer = null) : IOllam
 
     public IReadOnlyList<string> Questions => _questions;
 
-    public Task<string?> AskAsync(string prompt, CancellationToken cancellationToken = default)
+    private readonly List<string?> _models = [];
+
+    /// <summary>The model each question asked for; null where the configured triage model was left to answer.</summary>
+    public IReadOnlyList<string?> Models => _models;
+
+    public Task<string?> AskAsync(
+        string prompt,
+        CancellationToken cancellationToken = default,
+        string? model = null)
     {
         _questions.Add(prompt);
+        _models.Add(model);
         return Task.FromResult(Reply(prompt));
     }
 }

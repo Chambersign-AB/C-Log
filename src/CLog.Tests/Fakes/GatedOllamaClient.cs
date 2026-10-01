@@ -28,7 +28,10 @@ public sealed class GatedOllamaClient : IOllamaClient
         _released.Release();
     }
 
-    public async Task<string?> AskAsync(string prompt, CancellationToken cancellationToken = default)
+    public async Task<string?> AskAsync(
+        string prompt,
+        CancellationToken cancellationToken = default,
+        string? model = null)
     {
         _asked.Release();
         await _released.WaitAsync(cancellationToken);

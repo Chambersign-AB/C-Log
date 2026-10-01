@@ -15,4 +15,14 @@ public interface IFingerprintStore
     /// marked first and judged afterwards is lost for good if the judgement is interrupted.
     /// </summary>
     Task<bool> TryMarkSeenAsync(string fingerprint, DateTimeOffset seenAt, CancellationToken cancellationToken = default);
+
+    /// <summary>The issue filed for this fingerprint, if any.</summary>
+    Task<IssueLink?> GetIssueAsync(string fingerprint, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Remembers the issue filed for a fingerprint, or moves its last-reported time forward.
+    /// Kept apart from "seen" on purpose: it is saved the moment the issue exists, so an
+    /// interruption before the fingerprint is marked seen cannot lead to a second issue.
+    /// </summary>
+    Task SaveIssueAsync(string fingerprint, int issueNumber, DateTimeOffset reportedAt, CancellationToken cancellationToken = default);
 }

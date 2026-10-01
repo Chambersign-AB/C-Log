@@ -8,6 +8,7 @@ public sealed class CLogOptions
     public SeqOptions Seq { get; set; } = new();
     public OllamaOptions Ollama { get; set; } = new();
     public TriageOptions Triage { get; set; } = new();
+    public AnalysisOptions Analysis { get; set; } = new();
 
     /// <summary>How often the watcher polls Seq.</summary>
     public int IntervalMinutes { get; set; } = 5;

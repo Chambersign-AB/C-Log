@@ -45,6 +45,11 @@ public sealed class SqliteFingerprintStore : IFingerprintStore
                 last_seen   TEXT NOT NULL,
                 hit_count   INTEGER NOT NULL DEFAULT 1
             );
+            CREATE TABLE IF NOT EXISTS fingerprint_issues (
+                fingerprint   TEXT PRIMARY KEY,
+                issue_number  INTEGER NOT NULL,
+                last_reported TEXT NOT NULL
+            );
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
 
@@ -90,5 +95,53 @@ public sealed class SqliteFingerprintStore : IFingerprintStore
 
         var hitCount = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken));
         return hitCount == 1;
+    }
+
+    public async Task<IssueLink?> GetIssueAsync(string fingerprint, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT issue_number, last_reported FROM fingerprint_issues WHERE fingerprint = $fingerprint;";
+        command.Parameters.AddWithValue("$fingerprint", fingerprint);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        var lastReported = DateTimeOffset.Parse(
+            reader.GetString(1),
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal);
+        return new IssueLink(reader.GetInt32(0), lastReported);
+    }
+
+    public async Task SaveIssueAsync(
+        string fingerprint,
+        int issueNumber,
+        DateTimeOffset reportedAt,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO fingerprint_issues (fingerprint, issue_number, last_reported)
+            VALUES ($fingerprint, $issueNumber, $reportedAt)
+            ON CONFLICT(fingerprint) DO UPDATE SET
+                issue_number = $issueNumber,
+                last_reported = $reportedAt;
+            """;
+        command.Parameters.AddWithValue("$fingerprint", fingerprint);
+        command.Parameters.AddWithValue("$issueNumber", issueNumber);
+        command.Parameters.AddWithValue("$reportedAt", reportedAt.UtcDateTime.ToString("O"));
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 }

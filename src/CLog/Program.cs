@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using CLog;
+using CLog.Analysis;
 using CLog.Configuration;
 using CLog.Knowledge;
 using CLog.Ollama;
@@ -41,6 +42,27 @@ builder.Services.AddSingleton<IRuleSetProvider>(services => new FileRuleSetProvi
 builder.Services.AddSingleton<ITriageSink>(services => new ConsoleAndFileTriageSink(
     Resolve(services, o => o.TriageLogPath),
     services.GetRequiredService<ILogger<ConsoleAndFileTriageSink>>()));
+
+// Step two is registered only when it is switched on; without it TriageService gets no
+// issue reporter and stops at the verdict, as before.
+var analysis = builder.Configuration.GetSection(CLogOptions.SectionName).Get<CLogOptions>()?.Analysis
+    ?? new AnalysisOptions();
+if (analysis.Problem() is { } problem)
+{
+    throw new InvalidOperationException("CLog:Analysis:Enabled is true, but " + problem + ".");
+}
+
+if (analysis.Enabled)
+{
+    builder.Services.AddSingleton<ISourceRepository>(services => new GitSourceRepository(
+        Resolve(services, o => o.Analysis.RepoPath),
+        services.GetRequiredService<ILogger<GitSourceRepository>>()));
+    builder.Services.AddSingleton<CodeContextResolver>();
+    builder.Services.AddSingleton<IAnalysisModel, OllamaAnalysisModel>();
+    builder.Services.AddHttpClient<IIssueTracker, GitHubIssueTracker>();
+    builder.Services.AddSingleton<Analyst>();
+    builder.Services.AddSingleton<IssueReporter>();
+}
 
 builder.Services.AddSingleton<TriageService>();
 builder.Services.AddHostedService<TriageWorker>();

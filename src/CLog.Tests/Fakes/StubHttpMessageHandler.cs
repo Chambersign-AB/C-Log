@@ -14,6 +14,8 @@ public sealed class StubHttpMessageHandler(
     public IReadOnlyList<string> RequestBodies => _requestBodies;
     public int CallCount { get; private set; }
     public Uri? LastRequestUri { get; private set; }
+    public HttpMethod? LastMethod { get; private set; }
+    public string? LastAuthorization { get; private set; }
 
     /// <summary>Set to throw instead of answering, standing in for an unreachable service.</summary>
     public Exception? ThrowOnSend { get; set; }
@@ -27,6 +29,8 @@ public sealed class StubHttpMessageHandler(
     {
         CallCount++;
         LastRequestUri = request.RequestUri;
+        LastMethod = request.Method;
+        LastAuthorization = request.Headers.Authorization?.ToString();
 
         if (request.Content is not null)
         {

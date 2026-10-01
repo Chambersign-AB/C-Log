@@ -2,7 +2,7 @@
 
 Automated triage of .NET error logs. A background service reads Error events from Seq, groups
 them into distinct problems, and asks a local Mistral which ones a human should actually look
-at. Nothing leaves the machine.
+at. With step one alone, nothing leaves the machine.
 
 ## What
 
@@ -31,8 +31,9 @@ failure until a customer reports it.
 
 The work splits in two. **Step one is cheap**: group, deduplicate, drop the known noise, and
 have a small local model sort the rest. **Step two is expensive** and is reserved for the few
-errors step one flags as worth analysing. This repository is step one — see
-[docs/architecture.md](docs/architecture.md).
+errors step one flags as worth analysing: each is read against the code it came from and
+filed as a GitHub issue. Step two is off until it is configured — see [Step two](#step-two)
+and [docs/architecture.md](docs/architecture.md).
 
 Local by design. Production logs are exactly the data you should not be posting to a hosted
 API, so the model runs on the same machine and personal data is stripped before it even
@@ -125,7 +126,8 @@ mid-judgement loses nothing: the error is judged on the next start.
 dotnet test
 ```
 
-No test needs Seq, Ollama or a network connection.
+No test needs Seq, Ollama, GitHub or a network connection. The tests of the git-backed source
+reader build a throwaway repository on disk, so they need `git` on the PATH.
 
 ## Tuning it
 
@@ -134,6 +136,53 @@ No test needs Seq, Ollama or a network connection.
   take effect on the next cycle without a restart.
 - **An error you have since understood?** Add it to `knowledge/known-errors.md` and the model
   will start answering `KNOWN` with your solution instead of flagging it again.
+
+## Step two
+
+With step one alone, an `ANALYZE` verdict is a line in `triage.jsonl`. Step two turns it into a
+GitHub issue with a first analysis attached:
+
+1. **Find the code.** The three topmost stack frames in the `CSign.` namespace are matched to
+   files in a local clone, and 40 lines are read on each side of the line each frame names —
+   at most 4 files and 400 lines. The code is read at the commit named by the event's
+   `CommitHash` property when the clone has it, otherwise at HEAD. It is read with
+   `git show`, so the clone is never checked out or changed. Frames without file and line
+   (a build without symbols) give no code.
+2. **Analyse.** The scrubbed error, the code and the knowledge base go to a model, which is
+   asked for the likely cause, the place in the code and a fix.
+3. **File.** One issue per fingerprint, labelled `ai-triage`, with the error and the analysis
+   as its body. The issue number is kept with the fingerprint and written to `triage.jsonl`.
+   When the error comes back, its issue gets a comment — at most one per
+   `RecurrenceCommentMinutes`, not one per cycle.
+
+`NOISE`, `KNOWN`, rule-filtered and unjudged errors are never analysed or filed. If GitHub
+cannot be reached the error is not marked as seen and is tried again next cycle; that cycle
+judges and analyses it afresh.
+
+Everything is under `CLog:Analysis`:
+
+| Setting | Meaning | Default |
+| --- | --- | --- |
+| `Enabled` | Switches step two on | `false` |
+| `RepoPath` | Local clone of the repository the errors come from | none |
+| `NamespacePrefix` | Stack frames to look up | `CSign.` |
+| `CommitProperty` | Event property naming the deployed commit | `CommitHash` |
+| `Model` | Model that writes the analysis | `mistral` |
+| `Prompt` | The instruction given to it | see `appsettings.json` |
+| `RecurrenceCommentMinutes` | Least time between two "seen again" comments on one issue | `1440` |
+| `GitHub:Repository` | Where issues are filed, as `owner/name` | none |
+| `GitHub:Token` | Token allowed to create issues — a secret, see below | `""` |
+| `GitHub:Label` | Label put on every issue | `ai-triage` |
+
+The token is a secret like the Seq key: `dotnet user-secrets set "CLog:Analysis:GitHub:Token" "..."`
+or `CLog__Analysis__GitHub__Token` in the environment. The service refuses to start with step
+two enabled and the path, repository or token missing.
+
+**What leaves the machine.** With step two off, nothing does. With it on, the issue body —
+the scrubbed error report and the model's analysis — is sent to GitHub. Personal data is
+removed before either is produced, but the report still holds exception messages, stack
+frames and log properties, so file issues only in a repository whose readers may see those.
+The local clone is only as fresh as its last `git fetch`; CLog does not fetch.
 
 ## Layout
 
@@ -147,5 +196,6 @@ data/                   SQLite state and triage.jsonl (git-ignored, created on f
 
 ## Not in this round
 
-No GitHub integration, no Claude, no issue-filing, no alerting. Step one has to be trustworthy
-and quiet first.
+No GitHub Action, no Claude, no alerting. The analysis model sits behind its own interface
+(`IAnalysisModel`), so a stronger model can take over step two later without touching step
+one.

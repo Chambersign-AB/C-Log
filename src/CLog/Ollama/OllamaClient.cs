@@ -78,13 +78,16 @@ public sealed class OllamaClient : IOllamaClient
         return null;
     }
 
-    public async Task<string?> AskAsync(string prompt, CancellationToken cancellationToken = default)
+    public async Task<string?> AskAsync(
+        string prompt,
+        CancellationToken cancellationToken = default,
+        string? model = null)
     {
         // No JSON format here: the answer is one plain word, and asking for JSON makes a small
         // model wrap it in an object of its own invention.
         var request = new ChatRequest
         {
-            Model = _options.Model,
+            Model = string.IsNullOrWhiteSpace(model) ? _options.Model : model,
             Stream = false,
             Format = null,
             Messages = [new ChatMessage { Role = "user", Content = prompt }]
@@ -106,7 +109,7 @@ public sealed class OllamaClient : IOllamaClient
                 _logger.LogWarning(
                     "Ollama answered {StatusCode} for model {Model}; leaving the error unjudged",
                     (int)response.StatusCode,
-                    _options.Model);
+                    request.Model);
                 return (false, null);
             }
 

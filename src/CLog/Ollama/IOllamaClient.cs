@@ -14,6 +14,7 @@ public interface IOllamaClient
     /// <summary>
     /// Sends one prompt and returns the model's answer as plain text, unparsed. Returns null
     /// when the model could not be reached; an empty answer is an answer, not a failure.
+    /// <paramref name="model"/> overrides the configured triage model for this one question.
     /// </summary>
-    Task<string?> AskAsync(string prompt, CancellationToken cancellationToken = default);
+    Task<string?> AskAsync(string prompt, CancellationToken cancellationToken = default, string? model = null);
 }
