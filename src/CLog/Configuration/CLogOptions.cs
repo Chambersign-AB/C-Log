@@ -51,7 +51,7 @@ public sealed class OllamaOptions
 
 public enum TriageMode
 {
-    /// <summary>Two yes/no questions: is it a known error, then is it a failed call from outside.</summary>
+    /// <summary>Two yes/no questions: is it a known error, then is it a request rejected for the client's own mistake.</summary>
     TwoStep,
 
     /// <summary>The original single prompt asking the model to pick NOISE, KNOWN or ANALYZE. Kept for comparison.</summary>
@@ -81,10 +81,14 @@ public sealed class TriageOptions
         {error}
         """;
 
-    /// <summary>Second TwoStep question. {error} is filled in; yes means NOISE.</summary>
+    /// <summary>
+    /// Second TwoStep question. {error} is filled in; yes means NOISE. It asks about the client's
+    /// own mistake only: a broader "failed call from outside" made the model file supplier
+    /// timeouts and configuration faults as noise.
+    /// </summary>
     public string NoisePrompt { get; set; } =
         """
-        Är detta ett misslyckat anrop utifrån — fel API-nyckel, 401/404, avbruten begäran — snarare än ett fel i vår kod? Svara ENDAST Ja eller Nej.
+        Är detta en begäran från en klient som avvisades på grund av klientens eget fel — ogiltig eller saknad API-nyckel, 401, 403, 404, eller en begäran klienten själv avbröt? Svara ENDAST Ja eller Nej.
 
         # Fel
         {error}

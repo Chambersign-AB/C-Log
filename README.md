@@ -16,9 +16,9 @@ at. Nothing leaves the machine.
 - drops anything matched by an **ignore rule** in `knowledge/rules.json`, before any AI call;
 - asks a **local Mistral through Ollama** two yes/no questions to sort it into `NOISE`, `KNOWN`
   or `ANALYZE`: is it described in `knowledge/known-errors.md` (yes is `KNOWN`, with the
-  solution copied from that file), and if not, is it a failed call from outside rather than a
-  fault in our code (yes is `NOISE`). Anything else, including an answer that is neither yes
-  nor no, is `ANALYZE`;
+  solution copied from that file), and if not, is it a request that was rejected for the
+  client's own mistake (yes is `NOISE`). Anything else, including an answer that is neither
+  yes nor no, is `ANALYZE`;
 - writes the result to the **console** and appends it to **`data/triage.jsonl`**.
 
 Seen fingerprints live in SQLite, so a restart does not re-report last week's errors.
@@ -75,6 +75,12 @@ Everything is under the `CLog` section of `src/CLog/appsettings.json`:
 Small models (7B) could not choose between three verdicts in one call, which is why `TwoStep`
 is the default. Switching model or rewording a question is a config change: set `Ollama:Model`
 and the two prompts. The answer is read as yes for `Ja`/`Yes` and no for `Nej`/`No`.
+
+`NOISE` means *the client's fault*, not *an external fault*: an invalid or missing API key, a
+401, 403 or 404, or a request the client itself cancelled. A failure in something we call —
+a supplier timing out, a misconfigured downstream step — is ours to look at and goes to
+`ANALYZE`, or to `KNOWN` once it has an entry in the knowledge base. Keep that line if you
+reword `Triage:NoisePrompt`.
 
 The API key is a secret and does not belong in a committed file. Use either:
 

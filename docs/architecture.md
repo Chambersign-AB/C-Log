@@ -10,7 +10,7 @@ The two-step idea, in ten lines:
    This is deterministic and costs nothing.
 4. A local Mistral, via Ollama, then sorts each genuinely new error into NOISE, KNOWN or
    ANALYZE by answering two yes/no questions: is it in `knowledge/known-errors.md`, and if
-   not, is it a failed call from outside. Nothing leaves the machine, and personal data is
+   not, is it a request rejected for the client's own mistake. Nothing leaves the machine, and personal data is
    removed before the model sees it.
 5. **Step two is expensive and reserved.** Only ANALYZE survives step one, so a deeper and
    costlier analysis is spent on the few errors that earned it.

@@ -8,7 +8,7 @@ namespace CLog.Triage;
 
 /// <summary>
 /// Judges an error with two yes/no questions instead of one three-way choice: is it in the
-/// knowledge base, and if not, is it a failed call from outside. A small model answers yes or
+/// knowledge base, and if not, is it a request rejected for the client's own mistake. A small model answers yes or
 /// no far more reliably than it picks between NOISE, KNOWN and ANALYZE.
 /// </summary>
 public sealed class TwoStepJudge(IOllamaClient ollama, TriageOptions options, ILogger logger)
@@ -49,17 +49,17 @@ public sealed class TwoStepJudge(IOllamaClient ollama, TriageOptions options, IL
             }
         }
 
-        return await AskAsync(NoisePrompt(errorReport), "outside call", cancellationToken) switch
+        return await AskAsync(NoisePrompt(errorReport), "client mistake", cancellationToken) switch
         {
             Answer.Unreachable => null,
             Answer.Unclear => UnclearAnswer,
             Answer.Yes => new TriageVerdict(
                 Verdict.Noise,
-                "A failed call from outside rather than a fault in our code.",
+                "A request rejected for the client's own mistake, not a fault on our side.",
                 null),
             _ => new TriageVerdict(
                 Verdict.Analyze,
-                "Not a known error and not a failed call from outside.",
+                "Not a known error and not a client's own mistake.",
                 null)
         };
     }

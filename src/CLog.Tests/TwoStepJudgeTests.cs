@@ -57,7 +57,7 @@ public class TwoStepJudgeTests
     }
 
     [Fact]
-    public async Task A_no_to_known_and_a_yes_to_the_outside_call_question_is_NOISE()
+    public async Task A_no_to_known_and_a_yes_to_the_client_mistake_question_is_NOISE()
     {
         var (judge, ollama, _) = Build(prompt => IsKnownQuestion(prompt) ? "Nej" : "Ja");
 
@@ -68,7 +68,7 @@ public class TwoStepJudgeTests
         Assert.Null(verdict.KnownSolution);
 
         Assert.Equal(2, ollama.Questions.Count);
-        Assert.Contains("misslyckat anrop utifrån", ollama.Questions[1]);
+        Assert.Contains("avvisades på grund av klientens eget fel", ollama.Questions[1]);
         Assert.Contains("Order could not be saved", ollama.Questions[1]);
         Assert.DoesNotContain("Deadlock when saving an order", ollama.Questions[1]);
     }
@@ -121,7 +121,7 @@ public class TwoStepJudgeTests
     }
 
     [Fact]
-    public async Task An_unreadable_answer_to_the_outside_call_question_is_ANALYZE_with_a_warning()
+    public async Task An_unreadable_answer_to_the_client_mistake_question_is_ANALYZE_with_a_warning()
     {
         var (judge, _, logger) = Build(prompt => IsKnownQuestion(prompt) ? "Nej" : "Svårt att säga.");
 
@@ -204,21 +204,21 @@ public class TwoStepJudgeTests
         var options = new TriageOptions
         {
             KnownPrompt = "KNOWN? kb=[{knowledge}] err=[{error}]",
-            NoisePrompt = "OUTSIDE? err=[{error}]"
+            NoisePrompt = "CLIENT? err=[{error}]"
         };
         var (judge, ollama, _) = Build(_ => "Nej", options);
 
         await judge.JudgeAsync("the error", "## Entry\nbody");
 
         Assert.Equal(
-            new[] { "KNOWN? kb=[## Entry\nbody] err=[the error]", "OUTSIDE? err=[the error]" },
+            new[] { "KNOWN? kb=[## Entry\nbody] err=[the error]", "CLIENT? err=[the error]" },
             ollama.Questions);
     }
 
     [Fact]
     public async Task A_template_missing_its_placeholder_still_carries_the_error()
     {
-        var options = new TriageOptions { NoisePrompt = "Is this a failed call from outside?" };
+        var options = new TriageOptions { NoisePrompt = "Was this rejected for the client's own mistake?" };
         var (judge, ollama, _) = Build(_ => "Nej", options);
 
         await judge.JudgeAsync("the error", "");
