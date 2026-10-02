@@ -8,8 +8,8 @@ using CLog.Triage;
 namespace CLog.Analysis;
 
 /// <summary>
-/// Turns an error judged ANALYZE into an issue: analysed against its code, filed once, and
-/// commented on when the error comes back.
+/// Turns an error judged ANALYZE into an issue: shown with its code, or analysed against it
+/// in Model mode, filed once, and commented on when the error comes back.
 /// </summary>
 public sealed class IssueReporter(
     Analyst analyst,
@@ -19,6 +19,9 @@ public sealed class IssueReporter(
     ILogger<IssueReporter> logger)
 {
     private const int MaxTitleLength = 120;
+    private const int MaxStackLines = 60;
+
+    private readonly AnalysisMode _mode = options.Value.Analysis.Mode;
 
     private readonly TimeSpan _commentInterval =
         TimeSpan.FromMinutes(Math.Max(1, options.Value.Analysis.RecurrenceCommentMinutes));
@@ -36,7 +39,11 @@ public sealed class IssueReporter(
     {
         var analysis = await analyst.AnalyzeAsync(group.Sample, errorReport, knownErrors, cancellationToken);
 
-        var number = await tracker.CreateIssueAsync(Title(group), Body(errorReport, analysis), cancellationToken);
+        var body = _mode == AnalysisMode.Context
+            ? ContextBody(group, errorReport, analysis.Code)
+            : Body(errorReport, analysis);
+
+        var number = await tracker.CreateIssueAsync(Title(group), body, cancellationToken);
         if (number is null)
         {
             logger.LogWarning(
@@ -83,6 +90,55 @@ public sealed class IssueReporter(
 
         title = title.ReplaceLineEndings(" ").Trim();
         return title.Length <= MaxTitleLength ? title : title[..MaxTitleLength] + "…";
+    }
+
+    /// <summary>
+    /// Context mode: the error, its stack trace and the code around each application frame.
+    /// It points at the code and interprets nothing, so there is no analysis section and
+    /// nothing to disclaim.
+    /// </summary>
+    private static string ContextBody(ErrorGroup group, string errorReport, CodeContext code)
+    {
+        var body = new StringBuilder();
+
+        // Fenced, so nothing in a log line is read as markdown or as a mention of a GitHub user.
+        body.Append("## Error\n\n````text\n").Append(errorReport.Trim()).Append("\n````\n\n");
+
+        if (!string.IsNullOrWhiteSpace(group.Sample.Exception))
+        {
+            body.Append("## Stack trace\n\n````text\n").Append(StackTrace(group.Sample.Exception)).Append("\n````\n\n");
+        }
+
+        body.Append("## Kod runt felet\n\n");
+        if (code.Excerpts.Count == 0)
+        {
+            body.Append("_No file in the repository could be matched to the stack trace._\n\n");
+        }
+
+        foreach (var excerpt in code.Excerpts)
+        {
+            body.Append($"**`{excerpt.Path}`** line {excerpt.FocusLine}, in `{excerpt.Frame}`\n\n")
+                .Append("````text\n").Append(excerpt.Text.TrimEnd('\n')).Append("\n````\n\n");
+        }
+
+        body.Append("---\n_Filed automatically by CLog.");
+        if (code.Commit is { } commit)
+        {
+            body.Append(commit.FromEvent
+                ? $" Code read at commit `{commit.Hash}`, the build the error came from."
+                : $" Code read at commit `{commit.Hash}`, HEAD of the local clone, which may differ from the build the error came from.");
+        }
+
+        return body.Append("_\n").ToString();
+    }
+
+    /// <summary>The scrubbed exception text, cut off where a deep trace would crowd the code out of the issue.</summary>
+    private static string StackTrace(string exception)
+    {
+        var lines = exception.ReplaceLineEndings("\n").Trim().Split('\n');
+        return lines.Length <= MaxStackLines
+            ? string.Join('\n', lines)
+            : string.Join('\n', lines.Take(MaxStackLines)) + $"\n... ({lines.Length - MaxStackLines} more line(s))";
     }
 
     private static string Body(string errorReport, AnalysisResult analysis)

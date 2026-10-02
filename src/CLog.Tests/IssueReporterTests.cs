@@ -50,7 +50,11 @@ public class IssueReporterTests
 
     private TriageService Service(string rulesJson = """{ "ignore": [] }""", params SeqEvent[] events)
     {
-        var options = Options.Create(new CLogOptions { Analysis = new AnalysisOptions { Enabled = true } });
+        // Model mode: these tests cover the analysed issue. Context mode has its own tests.
+        var options = Options.Create(new CLogOptions
+        {
+            Analysis = new AnalysisOptions { Enabled = true, Mode = AnalysisMode.Model }
+        });
         var analyst = new Analyst(
             new CodeContextResolver(_repository, options), _analysisModel, options, new TestLogger<Analyst>());
         var reporter = new IssueReporter(analyst, _tracker, _store, options, new TestLogger<IssueReporter>());

@@ -12,10 +12,10 @@ The two-step idea, in ten lines:
    ANALYZE by answering two yes/no questions: is it in `knowledge/known-errors.md`, and if
    not, is it a request rejected for the client's own mistake. Nothing leaves the machine, and personal data is
    removed before the model sees it.
-5. **Step two is expensive and reserved.** Only ANALYZE survives step one, so a deeper and
-   costlier analysis is spent on the few errors that earned it.
-6. Step two reads the error against the code it came from, asks a model for cause, place and
-   fix, and files the result as a GitHub issue. It is off until configured.
+5. **Step two is reserved.** Only ANALYZE survives step one, so an issue is filed, and a
+   person's attention asked for, only for the few errors that earned it.
+6. Step two files the error as a GitHub issue together with the code it came from. It points
+   at the code and leaves the interpretation to a person. It is off until configured.
 
 ## Shape of a cycle
 
@@ -84,8 +84,14 @@ ANALYZE ──▶ stack frames ──▶ code at the commit ──▶ analysis m
             (top 3, CSign.*)  (±40 lines, git show)  (cause, place, fix) (once per fingerprint)
 ```
 
-- **A targeted call, not an agent.** One prompt holding the error, a bounded excerpt of code
-  and the knowledge base. No GitHub Action and no coding agent are involved.
+- **It points, it does not interpret.** In the default Context mode no model is asked: the
+  issue holds the error, the stack trace and the code around every application frame, with
+  line numbers and the throwing line marked. A 7B model's analysis was wrong often enough
+  that reading and discounting it cost more than the code alone. Model mode — the diagram
+  above, with its analysis step and only the top three frames — is kept behind
+  `Analysis:Mode` for comparison.
+- **In Model mode, a targeted call, not an agent.** One prompt holding the error, a bounded
+  excerpt of code and the knowledge base. No GitHub Action and no coding agent are involved.
 - **The clone is read, never changed.** Files are read with `git show commit:path` rather
   than by checking the commit out, so the clone can be somebody's working copy.
 - **Only paths the commit lists are read.** A frame carries a build-machine path; it is

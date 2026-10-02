@@ -11,13 +11,21 @@ namespace CLog.Analysis;
 /// </summary>
 public sealed class CodeContextResolver(ISourceRepository repository, IOptions<CLogOptions> options)
 {
+    /// <summary>Put in the margin of the line a frame names, in Context mode.</summary>
+    public const string FocusMarker = ">>>";
+
     private readonly AnalysisOptions _options = options.Value.Analysis;
 
     public async Task<CodeContext> ResolveAsync(SeqEvent sample, CancellationToken cancellationToken = default)
     {
-        var frames = SourceFrame.Parse(sample.Exception)
-            .Where(f => f.File is not null && f.Method.StartsWith(_options.NamespacePrefix, StringComparison.Ordinal))
-            .Take(Math.Max(0, _options.TopFrames))
+        var applicationFrames = SourceFrame.Parse(sample.Exception)
+            .Where(f => f.File is not null && f.Method.StartsWith(_options.NamespacePrefix, StringComparison.Ordinal));
+
+        // A model is shown only the top few frames, because every line costs it time. With
+        // no model to wait for, every application frame is worth showing, up to the limits.
+        var frames = (_options.Mode == AnalysisMode.Model
+                ? applicationFrames.Take(Math.Max(0, _options.TopFrames))
+                : applicationFrames)
             .ToList();
 
         if (frames.Count == 0)
@@ -35,6 +43,7 @@ public sealed class CodeContextResolver(ISourceRepository repository, IOptions<C
         var files = await repository.ListFilesAsync(commit.Hash, cancellationToken);
         var excerpts = new List<CodeExcerpt>();
         var filesRead = new HashSet<string>(StringComparer.Ordinal);
+        var placesRead = new HashSet<(string Path, int Line)>();
         var linesLeft = Math.Max(0, _options.MaxLines);
 
         foreach (var frame in frames)
@@ -46,6 +55,12 @@ public sealed class CodeContextResolver(ISourceRepository repository, IOptions<C
 
             var path = MatchFile(files, frame.File!);
             if (path is null || (!filesRead.Contains(path) && filesRead.Count >= _options.MaxFiles))
+            {
+                continue;
+            }
+
+            // Recursion and async state machines repeat a frame; the same lines twice say nothing new.
+            if (!placesRead.Add((path, frame.Line)))
             {
                 continue;
             }
@@ -122,10 +137,20 @@ public sealed class CodeContextResolver(ISourceRepository repository, IOptions<C
         var text = new StringBuilder();
         for (var number = start; number <= end; number++)
         {
-            text.Append(number.ToString().PadLeft(5))
-                .Append(number == frame.Line ? " > " : "   ")
-                .Append(lines[number - 1].TrimEnd('\r'))
-                .Append('\n');
+            var focus = number == frame.Line;
+
+            // A person scanning an issue needs a marker that stands out in the margin; the
+            // format the model is shown is left as it was.
+            if (_options.Mode == AnalysisMode.Model)
+            {
+                text.Append(number.ToString().PadLeft(5)).Append(focus ? " > " : "   ");
+            }
+            else
+            {
+                text.Append(focus ? FocusMarker : "   ").Append(number.ToString().PadLeft(6)).Append("  ");
+            }
+
+            text.Append(lines[number - 1].TrimEnd('\r')).Append('\n');
         }
 
         return new CodeExcerpt(path, start, end, frame.Line, frame.Method, text.ToString());

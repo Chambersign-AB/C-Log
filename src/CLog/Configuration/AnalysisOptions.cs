@@ -10,6 +10,12 @@ public sealed partial class AnalysisOptions
 {
     public bool Enabled { get; set; }
 
+    /// <summary>
+    /// Context is the default because a 7B model's analysis was wrong often enough to cost
+    /// more time than it saved; the code around the failing line is what a reader needs first.
+    /// </summary>
+    public AnalysisMode Mode { get; set; } = AnalysisMode.Context;
+
     /// <summary>A local clone of the repository the errors come from. Read through git, never modified.</summary>
     public string RepoPath { get; set; } = "";
 
@@ -19,6 +25,10 @@ public sealed partial class AnalysisOptions
     /// <summary>The event property naming the commit the failing build was made from. HEAD is read when it is absent.</summary>
     public string CommitProperty { get; set; } = "CommitHash";
 
+    /// <summary>
+    /// How many application frames are looked up in Model mode, where every line costs model
+    /// time. Context mode looks up each application frame, bounded by files and lines alone.
+    /// </summary>
     public int TopFrames { get; set; } = 3;
 
     /// <summary>Lines read on each side of the line a frame points at.</summary>
@@ -27,10 +37,11 @@ public sealed partial class AnalysisOptions
     public int MaxFiles { get; set; } = 4;
     public int MaxLines { get; set; } = 400;
 
+    /// <summary>Model mode only.</summary>
     public string Model { get; set; } = "mistral";
 
     /// <summary>
-    /// The instruction. The error, the code and the knowledge base follow it. It opens by
+    /// The instruction, in Model mode. The error, the code and the knowledge base follow it. It opens by
     /// tying the model to the error message: left to itself it invented a cause other than
     /// the one the message stated, and proposed changes to files the error never touched.
     /// </summary>
@@ -74,6 +85,15 @@ public sealed partial class AnalysisOptions
 
     [GeneratedRegex(@"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")]
     private static partial Regex RepositoryName();
+}
+
+public enum AnalysisMode
+{
+    /// <summary>The issue shows the error, the stack trace and the code around each application frame. No model is asked.</summary>
+    Context,
+
+    /// <summary>A model reads the error against the code and its analysis goes in the issue.</summary>
+    Model
 }
 
 public sealed class GitHubOptions

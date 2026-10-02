@@ -8,8 +8,8 @@ using CLog.Model;
 namespace CLog.Analysis;
 
 /// <summary>
-/// Step two for one error: gathers the code it came from and asks a model for the likely
-/// cause, the place in the code and a fix. Only ever given the scrubbed event.
+/// Step two for one error: gathers the code it came from and, in Model mode, asks a model
+/// for the likely cause, the place in the code and a fix. Only ever given the scrubbed event.
 /// </summary>
 public sealed class Analyst(
     CodeContextResolver resolver,
@@ -28,6 +28,12 @@ public sealed class Analyst(
         CancellationToken cancellationToken = default)
     {
         var code = await resolver.ResolveAsync(sample, cancellationToken);
+        if (_options.Mode == AnalysisMode.Context)
+        {
+            // The issue points at the code and leaves the reading of it to a person.
+            return new AnalysisResult(null, code);
+        }
+
         var answer = await model.CompleteAsync(BuildPrompt(errorReport, code, knownErrors), cancellationToken);
 
         if (string.IsNullOrWhiteSpace(answer))

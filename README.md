@@ -31,9 +31,9 @@ among the expected ones. Reading them all is the job nobody does, so nobody find
 failure until a customer reports it.
 
 The work splits in two. **Step one is cheap**: group, deduplicate, drop the known noise, and
-have a small local model sort the rest. **Step two is expensive** and is reserved for the few
-errors step one flags as worth analysing: each is read against the code it came from and
-filed as a GitHub issue. Step two is off until it is configured — see [Step two](#step-two)
+have a small local model sort the rest. **Step two** is reserved for the few errors step one
+flags as worth a person's time: each is filed as a GitHub issue together with the code it
+came from. Step two is off until it is configured — see [Step two](#step-two)
 and [docs/architecture.md](docs/architecture.md).
 
 Local by design. Production logs are exactly the data you should not be posting to a hosted
@@ -143,35 +143,52 @@ reader build a throwaway repository on disk, so they need `git` on the PATH.
 ## Step two
 
 With step one alone, an `ANALYZE` verdict is a line in `triage.jsonl`. Step two turns it into a
-GitHub issue with a first analysis attached:
+GitHub issue. **It points at the code; it does not interpret it.** The issue shows the error,
+its stack trace and the code around the place it was thrown, and leaves the reading to a
+person. No model is asked:
 
-1. **Find the code.** The three topmost stack frames in the `CSign.` namespace are matched to
-   files in a local clone, and 40 lines are read on each side of the line each frame names —
-   at most 4 files and 400 lines. The code is read at the commit named by the event's
-   `CommitHash` property when the clone has it, otherwise at HEAD. It is read with
-   `git show`, so the clone is never checked out or changed. Frames without file and line
-   (a build without symbols) give no code.
-2. **Analyse.** The scrubbed error, the code and the knowledge base go to a model, which is
-   asked for the likely cause, the place in the code and a fix.
-3. **File.** One issue per fingerprint, labelled `ai-triage`, with the error and the analysis
-   as its body. The issue number is kept with the fingerprint and written to `triage.jsonl`.
+1. **Find the code.** Every stack frame in the `CSign.` namespace is matched to a file in a
+   local clone, and 40 lines are read on each side of the line the frame names — at most 4
+   files and 400 lines. The code is read at the commit named by the event's `CommitHash`
+   property when the clone has it, otherwise at HEAD. It is read with `git show`, so the
+   clone is never checked out or changed. Frames without file and line (a build without
+   symbols) give no code.
+2. **File.** One issue per fingerprint, labelled `ai-triage`. Its body is the scrubbed error,
+   the stack trace, and under "Kod runt felet" each excerpt with its line numbers written out
+   and `>>>` in the margin of the throwing line. The footnote names the commit the code was
+   read at. The issue number is kept with the fingerprint and written to `triage.jsonl`.
    When the error comes back, its issue gets a comment — at most one per
    `RecurrenceCommentMinutes`, not one per cycle.
 
-`NOISE`, `KNOWN`, rule-filtered and unjudged errors are never analysed or filed. If GitHub
-cannot be reached the error is not marked as seen and is tried again next cycle; that cycle
-judges and analyses it afresh.
+```
+      118      var key = _keys.Load(document.KeyId);
+      119      if (key is null)
+>>>   120          throw new InvalidOperationException("signing key missing");
+      121
+```
+
+`NOISE`, `KNOWN`, rule-filtered and unjudged errors are never filed. If GitHub cannot be
+reached the error is not marked as seen and is tried again next cycle; that cycle judges it
+afresh.
+
+**`Mode: Model`** is the earlier behaviour, kept for comparison. Between the two steps above,
+the scrubbed error, the code and the knowledge base go to a model, which is asked for the
+likely cause, the place in the code and a fix; the issue then carries that analysis instead of
+the code, and says it is a model's suggestion. Only the three topmost frames are looked up,
+because every line costs the model time. `Context` is the default because a 7B model's
+analysis was wrong often enough to cost more time than it saved.
 
 Everything is under `CLog:Analysis`:
 
 | Setting | Meaning | Default |
 | --- | --- | --- |
 | `Enabled` | Switches step two on | `false` |
+| `Mode` | `Context` files the error with its code and asks no model; `Model` adds a model's analysis | `Context` |
 | `RepoPath` | Local clone of the repository the errors come from | none |
 | `NamespacePrefix` | Stack frames to look up | `CSign.` |
 | `CommitProperty` | Event property naming the deployed commit | `CommitHash` |
-| `Model` | Model that writes the analysis | `mistral` |
-| `Prompt` | The instruction given to it | see `appsettings.json` |
+| `Model` | Model that writes the analysis, in `Model` mode | `mistral` |
+| `Prompt` | The instruction given to it, in `Model` mode | see `appsettings.json` |
 | `RecurrenceCommentMinutes` | Least time between two "seen again" comments on one issue | `1440` |
 | `GitHub:Repository` | Where issues are filed, as `owner/name` | none |
 | `GitHub:Token` | Token allowed to create issues — a secret, see below | `""` |
@@ -182,9 +199,11 @@ or `CLog__Analysis__GitHub__Token` in the environment. The service refuses to st
 two enabled and the path, repository or token missing.
 
 **What leaves the machine.** With step two off, nothing does. With it on, the issue body —
-the scrubbed error report and the model's analysis — is sent to GitHub. Personal data is
-removed before either is produced, but the report still holds exception messages, stack
-frames and log properties, so file issues only in a repository whose readers may see those.
+the scrubbed error report, the stack trace and excerpts of the repository's own code, or in
+`Model` mode the report and the model's analysis — is sent to GitHub. Personal data is
+removed before any of it is produced, but the report still holds exception messages, stack
+frames and log properties, so file issues only in a repository whose readers may see those
+and the code.
 The local clone is only as fresh as its last `git fetch`; CLog does not fetch.
 
 ## Layout
@@ -199,6 +218,6 @@ data/                   SQLite state and triage.jsonl (git-ignored, created on f
 
 ## Not in this round
 
-No GitHub Action, no Claude, no alerting. The analysis model sits behind its own interface
-(`IAnalysisModel`), so a stronger model can take over step two later without touching step
-one.
+No GitHub Action, no Claude, no alerting. In `Model` mode the analysis model sits behind its
+own interface (`IAnalysisModel`), so a stronger model can take over step two later without
+touching step one.

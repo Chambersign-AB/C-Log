@@ -22,7 +22,10 @@ public class AnalystTests
 
     private Analyst NewAnalyst(AnalysisOptions? analysis = null)
     {
-        var options = Options.Create(new CLogOptions { Analysis = analysis ?? new AnalysisOptions() });
+        // Model mode throughout: these tests are about the prompt, and the default mode asks no model.
+        analysis ??= new AnalysisOptions();
+        analysis.Mode = AnalysisMode.Model;
+        var options = Options.Create(new CLogOptions { Analysis = analysis });
         return new Analyst(new CodeContextResolver(_repository, options), _model, options, new TestLogger<Analyst>());
     }
 

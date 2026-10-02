@@ -20,8 +20,14 @@ public class CodeContextResolverTests
         .WithNumberedFile(KeyStore, 200)
         .WithNumberedFile(Fourth, 200);
 
-    private CodeContextResolver Resolver(AnalysisOptions? analysis = null) =>
-        new(_repository, Options.Create(new CLogOptions { Analysis = analysis ?? new AnalysisOptions() }));
+    // Model mode throughout: the frame limit and the line format pinned here are the ones a
+    // model is given. Context mode has its own tests.
+    private CodeContextResolver Resolver(AnalysisOptions? analysis = null)
+    {
+        analysis ??= new AnalysisOptions();
+        analysis.Mode = AnalysisMode.Model;
+        return new(_repository, Options.Create(new CLogOptions { Analysis = analysis }));
+    }
 
     private static string Frame(string method, string repoPath, int line) =>
         $"   at {method} in {BuildRoot}{repoPath.Replace('/', '\\')}:line {line}";

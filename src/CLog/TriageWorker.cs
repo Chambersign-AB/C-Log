@@ -28,7 +28,13 @@ public sealed class TriageWorker(
             "CLog started. Polling {SeqUrl} every {Interval}, judging with {Model} at {OllamaUrl} in {Mode} mode, at most {Max} judgement(s) per cycle",
             _options.Seq.Url, interval, _options.Ollama.Model, _options.Ollama.Url, _options.Triage.Mode, _options.MaxJudgementsPerRun);
 
-        if (_options.Analysis.Enabled)
+        if (_options.Analysis is { Enabled: true, Mode: AnalysisMode.Context })
+        {
+            logger.LogInformation(
+                "Step two is on in Context mode: ANALYZE errors are filed in {Repository} with the code around the error from {RepoPath}; no model is asked",
+                _options.Analysis.GitHub.Repository, _options.Analysis.RepoPath);
+        }
+        else if (_options.Analysis.Enabled)
         {
             logger.LogInformation(
                 "Step two is on: ANALYZE errors are read against {RepoPath}, analysed with {Model} and filed in {Repository}",
