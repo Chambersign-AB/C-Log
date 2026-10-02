@@ -4,6 +4,7 @@ using CLog.Analysis;
 using CLog.Configuration;
 using CLog.Knowledge;
 using CLog.Model;
+using CLog.Notifications;
 using CLog.Ollama;
 using CLog.Output;
 using CLog.Seq;
@@ -25,7 +26,8 @@ public sealed class TriageService(
     IOptions<CLogOptions> options,
     ILogger<TriageService> logger,
     TimeProvider? time = null,
-    IssueReporter? issues = null)
+    IssueReporter? issues = null,
+    ErrorNotifier? notifier = null)
 {
     private readonly CLogOptions _options = options.Value;
     private readonly TimeProvider _time = time ?? TimeProvider.System;
@@ -73,6 +75,7 @@ public sealed class TriageService(
         var failures = 0;
         var deferred = 0;
         var unreported = 0;
+        var notices = new List<Notice>();
 
         foreach (var group in groups)
         {
@@ -106,6 +109,12 @@ public sealed class TriageService(
                 if (issues is not null)
                 {
                     await issues.CommentIfDueAsync(group, now, cancellationToken);
+                }
+
+                if (notifier is not null
+                    && await notifier.ForRecurrenceAsync(group, now, cancellationToken) is { } again)
+                {
+                    notices.Add(again);
                 }
 
                 continue;
@@ -150,7 +159,23 @@ public sealed class TriageService(
             if (!await ReportAsync(TriageReports.Judged(group, verdict, now) with { IssueNumber = issue }, cancellationToken))
             {
                 unreported++;
+                continue;
             }
+
+            // Only once the outcome is on record, so a notice never speaks of an error that
+            // the triage log and the issue tracker know nothing about.
+            if (notifier is not null && verdict is not null
+                && await notifier.ForOutcomeAsync(group, verdict, now, cancellationToken) is { } notice)
+            {
+                notices.Add(notice);
+            }
+        }
+
+        // One notification for the whole cycle, after every outcome is written and every
+        // issue filed: whatever happens to it, none of that is undone.
+        if (notifier is not null)
+        {
+            await notifier.SendAsync(notices, now, cancellationToken);
         }
 
         if (deferred > 0)

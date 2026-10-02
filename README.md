@@ -198,13 +198,51 @@ The token is a secret like the Seq key: `dotnet user-secrets set "CLog:Analysis:
 or `CLog__Analysis__GitHub__Token` in the environment. The service refuses to start with step
 two enabled and the path, repository or token missing.
 
-**What leaves the machine.** With step two off, nothing does. With it on, the issue body —
+**What leaves the machine.** With step two and [notices](#notices) off, nothing does. With
+step two on, the issue body —
 the scrubbed error report, the stack trace and excerpts of the repository's own code, or in
 `Model` mode the report and the model's analysis — is sent to GitHub. Personal data is
 removed before any of it is produced, but the report still holds exception messages, stack
 frames and log properties, so file issues only in a repository whose readers may see those
 and the code.
 The local clone is only as fresh as its last `git fetch`; CLog does not fetch.
+
+## Notices
+
+`triage.jsonl` and the issue tracker wait to be read. A notice goes to people instead: one
+e-mail per cycle with a line for each error that needs somebody.
+
+```
+[ANALYZE] InvalidOperationException i SigningSessionsController.GetReceipt — ×2 — https://github.com/owner/name/issues/389
+[KNOWN] HttpRequestException i GiiApiClient.GetSigningUrlAsync — ×1 — Lösning: Vänta ut leverantören.
+```
+
+- Sent for errors judged `ANALYZE` or `KNOWN`, never for `NOISE`, rule-filtered or unjudged
+  ones. `KNOWN` lines end with the solution from `knowledge/known-errors.md`; `ANALYZE`
+  lines end with the link to the issue when step two is on.
+- Sent when the error gets its verdict and again when it comes back, at most once per
+  fingerprint per `RepeatMinutes` — the same kind of limit as issue comments. The repeat is
+  built from what was remembered; the error is not judged again.
+- A notice that fails is a warning in the log and nothing more: the error is still recorded
+  and filed. The notice goes out the next time that error is fetched.
+
+Everything is under `CLog:Notify`:
+
+| Setting | Meaning | Default |
+| --- | --- | --- |
+| `Channels` | Channels to send through, comma-separated. Empty switches notices off. Only `Mail` exists; `Slack` is refused at start until it does | `""` |
+| `RepeatMinutes` | Least time between two notices about one fingerprint | `1440` |
+| `Mailgun:ApiUrl` | Mailgun API address; `https://api.eu.mailgun.net` for a domain in the EU region | `https://api.mailgun.net` |
+| `Mailgun:ApiKey` | Mailgun API key — a secret, see below | `""` |
+| `Mailgun:Domain` | Sending domain registered with Mailgun | none |
+| `Mailgun:To` | Recipient, or several separated by commas | none |
+| `Mailgun:From` | Sender address | none |
+
+The key is a secret like the Seq key: `dotnet user-secrets set "CLog:Notify:Mailgun:ApiKey" "..."`
+or `CLog__Notify__Mailgun__ApiKey` in the environment. The service refuses to start with a
+channel named and its settings missing. A notice holds the exception type, the method it was
+thrown in and, for a known error, the solution text — all taken from the scrubbed event and
+the knowledge base — and is sent to Mailgun.
 
 ## Layout
 
@@ -218,6 +256,6 @@ data/                   SQLite state and triage.jsonl (git-ignored, created on f
 
 ## Not in this round
 
-No GitHub Action, no Claude, no alerting. In `Model` mode the analysis model sits behind its
+No GitHub Action, no Claude, no Slack channel, no paging or escalation. In `Model` mode the analysis model sits behind its
 own interface (`IAnalysisModel`), so a stronger model can take over step two later without
 touching step one.

@@ -107,4 +107,18 @@ public sealed class GitHubOptions
     public string Token { get; set; } = "";
 
     public string Label { get; set; } = "ai-triage";
+
+    /// <summary>
+    /// The page a person opens for an issue. Derived from the API address: github.com serves
+    /// its API from api.github.com, GitHub Enterprise from /api/v3 on the same host.
+    /// </summary>
+    public string IssueUrl(int number)
+    {
+        var api = ApiUrl.TrimEnd('/');
+        var site = api.Equals("https://api.github.com", StringComparison.OrdinalIgnoreCase)
+            ? "https://github.com"
+            : api.EndsWith("/api/v3", StringComparison.OrdinalIgnoreCase) ? api[..^"/api/v3".Length] : api;
+
+        return $"{site}/{Repository}/issues/{number}";
+    }
 }

@@ -28,6 +28,19 @@ public sealed class InMemoryFingerprintStore : IFingerprintStore
         return Task.CompletedTask;
     }
 
+    private readonly Dictionary<string, NoticeState> _notices = new(StringComparer.Ordinal);
+
+    public IReadOnlyDictionary<string, NoticeState> Notices => _notices;
+
+    public Task<NoticeState?> GetNoticeAsync(string fingerprint, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_notices.GetValueOrDefault(fingerprint));
+
+    public Task SaveNoticeAsync(string fingerprint, NoticeState state, CancellationToken cancellationToken = default)
+    {
+        _notices[fingerprint] = state;
+        return Task.CompletedTask;
+    }
+
     public Task<bool> IsSeenAsync(string fingerprint, CancellationToken cancellationToken = default) =>
         Task.FromResult(_seen.ContainsKey(fingerprint));
 

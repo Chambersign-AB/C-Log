@@ -41,6 +41,13 @@ public sealed class TriageWorker(
                 _options.Analysis.RepoPath, _options.Analysis.Model, _options.Analysis.GitHub.Repository);
         }
 
+        if (_options.Notify.Enabled)
+        {
+            logger.LogInformation(
+                "Notices are on: ANALYZE and KNOWN errors are sent through {Channels}, at most once per fingerprint every {Minutes} minute(s)",
+                string.Join(", ", _options.Notify.ChannelNames()), _options.Notify.RepeatMinutes);
+        }
+
         using var timer = new PeriodicTimer(interval, timeProvider);
 
         // One cycle at a time. A slow model can make a cycle outlast the interval; the poll

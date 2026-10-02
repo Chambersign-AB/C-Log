@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
+using CLog.Model;
 
 namespace CLog.Storage;
 
@@ -49,6 +50,12 @@ public sealed class SqliteFingerprintStore : IFingerprintStore
                 fingerprint   TEXT PRIMARY KEY,
                 issue_number  INTEGER NOT NULL,
                 last_reported TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS fingerprint_notices (
+                fingerprint   TEXT PRIMARY KEY,
+                verdict       TEXT NOT NULL,
+                solution      TEXT NULL,
+                last_notified TEXT NULL
             );
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -141,6 +148,56 @@ public sealed class SqliteFingerprintStore : IFingerprintStore
         command.Parameters.AddWithValue("$fingerprint", fingerprint);
         command.Parameters.AddWithValue("$issueNumber", issueNumber);
         command.Parameters.AddWithValue("$reportedAt", reportedAt.UtcDateTime.ToString("O"));
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<NoticeState?> GetNoticeAsync(string fingerprint, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT verdict, solution, last_notified FROM fingerprint_notices WHERE fingerprint = $fingerprint;";
+        command.Parameters.AddWithValue("$fingerprint", fingerprint);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken) || !Enum.TryParse<Verdict>(reader.GetString(0), out var verdict))
+        {
+            return null;
+        }
+
+        DateTimeOffset? lastNotified = reader.IsDBNull(2)
+            ? null
+            : DateTimeOffset.Parse(
+                reader.GetString(2),
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal);
+        return new NoticeState(verdict, reader.IsDBNull(1) ? null : reader.GetString(1), lastNotified);
+    }
+
+    public async Task SaveNoticeAsync(string fingerprint, NoticeState state, CancellationToken cancellationToken = default)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO fingerprint_notices (fingerprint, verdict, solution, last_notified)
+            VALUES ($fingerprint, $verdict, $solution, $lastNotified)
+            ON CONFLICT(fingerprint) DO UPDATE SET
+                verdict = $verdict,
+                solution = $solution,
+                last_notified = $lastNotified;
+            """;
+        command.Parameters.AddWithValue("$fingerprint", fingerprint);
+        command.Parameters.AddWithValue("$verdict", state.Verdict.ToString());
+        command.Parameters.AddWithValue("$solution", (object?)state.Solution ?? DBNull.Value);
+        command.Parameters.AddWithValue(
+            "$lastNotified",
+            (object?)state.LastNotifiedAt?.UtcDateTime.ToString("O") ?? DBNull.Value);
 
         await command.ExecuteNonQueryAsync(cancellationToken);
     }

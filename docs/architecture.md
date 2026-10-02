@@ -110,6 +110,18 @@ ANALYZE ──▶ stack frames ──▶ code at the commit ──▶ analysis m
 - **The model is behind `IAnalysisModel`.** Ollama today; a hosted model can replace it for
   step two alone.
 
+## Notices
+
+- **One notification per cycle, a line per error.** ANALYZE and KNOWN only. It is sent last,
+  after every outcome is written and every issue filed, so nothing it does can undo those.
+- **A failed notice never stops a cycle.** A channel that is down or throws is a warning. The
+  error keeps its outcome and its issue, and the notice goes out the next time it is fetched.
+- **The verdict is remembered for the notice.** An error that comes back is not judged again,
+  so the verdict and the known solution are stored with the fingerprint when it is judged,
+  and the time is stored only once a notice has actually been delivered.
+- **Channels are behind `INotifier`.** Mailgun today; Slack is a second implementation, not a
+  change to the cycle.
+
 ## What is deliberately not here
 
-No GitHub Action, no Claude, no alerting.
+No GitHub Action, no Claude, no paging or escalation.
