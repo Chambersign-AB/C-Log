@@ -55,8 +55,11 @@ public class AnalystTests
         var (_, prompt) = await AnalyzeAsync();
 
         Assert.StartsWith(
-            "Här är ett fel och koden det uppstod i. Ange trolig orsak (1–3 meningar), var i koden (fil:rad), "
-            + "och ett lösningsförslag. Svara i markdown.",
+            "Börja med felmeddelandet. Om det säger vad som gick fel, utgå från det — föreslå inte en annan orsak. "
+            + "Säg uttryckligen om koden du fått inte räcker för att förklara felet. "
+            + "Föreslå inga ändringar i filer som inte innehåller den kastande raden.\n\n"
+            + "Här är ett fel och koden det uppstod i. Ange trolig orsak (1–3 meningar), var i koden (fil:rad), "
+            + "och ett lösningsförslag. Svara i markdown.\n\n# Fel\n",
             prompt);
     }
 

@@ -29,9 +29,16 @@ public sealed partial class AnalysisOptions
 
     public string Model { get; set; } = "mistral";
 
-    /// <summary>The instruction. The error, the code and the knowledge base follow it.</summary>
+    /// <summary>
+    /// The instruction. The error, the code and the knowledge base follow it. It opens by
+    /// tying the model to the error message: left to itself it invented a cause other than
+    /// the one the message stated, and proposed changes to files the error never touched.
+    /// </summary>
     public string Prompt { get; set; } =
-        "Här är ett fel och koden det uppstod i. Ange trolig orsak (1–3 meningar), var i koden (fil:rad), "
+        "Börja med felmeddelandet. Om det säger vad som gick fel, utgå från det — föreslå inte en annan orsak. "
+        + "Säg uttryckligen om koden du fått inte räcker för att förklara felet. "
+        + "Föreslå inga ändringar i filer som inte innehåller den kastande raden.\n\n"
+        + "Här är ett fel och koden det uppstod i. Ange trolig orsak (1–3 meningar), var i koden (fil:rad), "
         + "och ett lösningsförslag. Svara i markdown.";
 
     /// <summary>
